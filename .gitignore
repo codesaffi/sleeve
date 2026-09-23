@@ -1,0 +1,186 @@
+# Root .gitignore for gaming-commerce (centralized for backend/, frontend/, admin/)
+# Location: C:/Users/PMLS/OneDrive/Desktop/gaming-commerce/.gitignore
+
+# =========================
+# Node modules
+# =========================
+# ignore node_modules everywhere
+node_modules/
+
+# =========================
+# Environment / secrets
+# =========================
+# Ignore all env files but allow example templates
+.env
+.env.*
+!.env.example
+
+# Common local env variants
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Prevent accidental commits of common secret/credential files
+credentials.json
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# =========================
+# Build / production output
+# =========================
+# Frontend build outputs (Vite, CRA, etc.)
+dist/
+build/
+out/
+
+# Next.js (if any)
+.next/
+
+# Backend build outputs (if transpiled to dist/build)
+server/dist/
+build/
+
+# =========================
+# Vite specific
+# =========================
+.vite/
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Coverage / test output
+# =========================
+coverage/
+.nyc_output/
+coverage-*/
+
+# =========================
+# Cache / temporary files
+# =========================
+.cache/
+.parcel-cache/
+.temp/
+tmp/
+temp/
+.cache-loader/
+
+# Parcel/Vite dev cache
+.cache-vite/
+
+# Mac / Windows temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Windows Recycle Bin metadata
+$RECYCLE.BIN/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Local editor history
+.history/
+
+# =========================
+# Debug / Diagnostics
+# =========================
+npm-debug.log*
+yarn-debug.log*
+debug.log*
+debug/
+.pnp-debug.log*
+
+# =========================
+# Backend local / development-only files
+# =========================
+# Ignore backend uploads (development temporary uploads). Anchored to backend for safety.
+/backend/uploads/
+
+# If other temporary upload dirs exist at other locations, uncomment the following
+# uploads/
+
+# local runtime files
+.env.*.local
+.local-credentials/
+
+# =========================
+# Database / local data
+# =========================
+*.sqlite
+*.sqlite3
+*.db
+dump/
+dumps/
+*.dump
+
+# =========================
+# Security / Keys
+# =========================
+# Private key/cert patterns (prevent accidental commit)
+private.key
+id_rsa
+id_rsa.pub
+id_dsa
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# AWS / GCP credentials
+credentials.yml
+google-services.json
+firebase-debug.*
+
+# =========================
+# Package managers - DO NOT IGNORE lockfiles and package manifests
+# =========================
+# keep package.json, package-lock.json, yarn.lock, pnpm-lock.yaml tracked
+
+# =========================
+# Misc
+# =========================
+# Local OS files
+ehthumbs.db
+Icon
+
+# Editor swap files
+*~
+*.swp
+*.swo
+
+# Ensure source folders and important configs are NOT ignored
+# (Do NOT ignore these unless intentionally generated artifacts)
+!src/
+!public/
+!assets/
+!package.json
+!package-lock.json
+!yarn.lock
+!pnpm-lock.yaml
+!vite.config.*
+!tailwind.config.*
+!README.md
+
+# End of .gitignore
