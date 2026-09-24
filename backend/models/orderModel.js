@@ -12,6 +12,9 @@ const orderSchema = new mongoose.Schema({
     date: { type: Number, required: true },
     marketingConsent: { type: Boolean, default: false }, // opt-in marketing preference
     verified: { type: Boolean, default: true },          // false only during pending guest OTP flow (not stored here), always true on final save
+    discountCode: { type: String, default: '' },
+    discountPercentage: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 }
 })
 
 const orderModel = mongoose.models.order || mongoose.model('order', orderSchema)

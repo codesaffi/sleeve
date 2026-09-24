@@ -16,7 +16,7 @@ const ShopContextProvider = (props) => {
 
   const formatPrice = (price) => new Intl.NumberFormat('en-PK').format(price);
 
-  const addToCart = async (itemId, size) => {
+  const addToCart = async (itemId, size, customVal = null) => {
     const product = products.find((p) => p._id === itemId);
     // require option only if product provides options
     if (product && product.sizes && product.sizes.length > 0 && !size) {
@@ -24,7 +24,10 @@ const ShopContextProvider = (props) => {
       return;
     }
 
-    const optionKey = size || "Default";
+    let optionKey = size || "Default";
+    if (customVal) {
+        optionKey = `${optionKey}|${customVal}`;
+    }
 
     let cartData = structuredClone(cartItems);
 
@@ -44,7 +47,7 @@ const ShopContextProvider = (props) => {
       try {
         await axios.post(
           backendUrl + '/api/cart/add',
-          { itemId, size },
+          { itemId, size: optionKey },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } catch (error) {

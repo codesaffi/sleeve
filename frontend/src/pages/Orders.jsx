@@ -80,9 +80,14 @@ const Orders = () => {
                     <span className="flex items-center gap-1 bg-white px-2 py-0.5 border border-border">
                       Qty: {item.quantity}
                     </span>
-                    {item.size && (
+                    {item.size && item.size !== "Default" && (
                       <span className="flex items-center gap-1 bg-white px-2 py-0.5 border border-border">
-                        Frame: {item.size}
+                        Frame: {item.size.split('|')[0]}
+                      </span>
+                    )}
+                    {item.designSource && (
+                      <span className="flex items-center gap-1 bg-black/5 px-2 py-0.5 border border-primary/20 text-xs">
+                        {item.designSource}
                       </span>
                     )}
                   </div>

@@ -25,6 +25,13 @@ const PlaceOrder = () => {
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
 
+  // Discount States
+  const [discountInput, setDiscountInput] = useState("");
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState("");
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [validatingDiscount, setValidatingDiscount] = useState(false);
+
   const {
     token,
     cartItems,
@@ -56,6 +63,41 @@ const PlaceOrder = () => {
     setFormData((data) => ({ ...data, [name]: value }));
   };
 
+  const applyDiscount = async () => {
+    if (!discountInput.trim()) {
+      toast.error("Please enter a discount code.");
+      return;
+    }
+    setValidatingDiscount(true);
+    try {
+      const response = await axios.post(backendUrl + '/api/discount/validate', { code: discountInput });
+      if (response.data.success) {
+        toast.success(`Discount code applied — ${response.data.discountPercentage}% off.`);
+        setAppliedDiscountCode(response.data.code);
+        setDiscountPercentage(response.data.discountPercentage);
+        
+        // Calculate amount
+        const amount = getCartAmount();
+        const discountAmt = Math.round((amount * response.data.discountPercentage) / 100);
+        setDiscountAmount(discountAmt);
+      } else {
+        toast.error(response.data.message);
+        removeDiscount();
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setValidatingDiscount(false);
+    }
+  };
+
+  const removeDiscount = () => {
+    setDiscountInput("");
+    setAppliedDiscountCode("");
+    setDiscountPercentage(0);
+    setDiscountAmount(0);
+  };
+
   const buildOrderItems = () => {
     const orderItems = [];
     for (const items in cartItems) {
@@ -63,7 +105,20 @@ const PlaceOrder = () => {
         if (cartItems[items][item] > 0) {
           const itemInfo = structuredClone(products.find((product) => product._id === items));
           if (itemInfo) {
-            itemInfo.size = item;
+            const parts = item.split('|');
+            itemInfo.size = parts[0];
+            if (parts.length > 1) {
+                const customParts = parts[1].split('::');
+                const customType = customParts[0];
+                if (customType === 'gallery') {
+                    itemInfo.designSource = 'Gallery';
+                    itemInfo.galleryImageId = customParts[1];
+                    itemInfo.customImageUrl = customParts.slice(2).join('::');
+                } else if (customType === 'custom') {
+                    itemInfo.designSource = 'Customer Upload';
+                    itemInfo.customImageUrl = customParts.slice(1).join('::');
+                }
+            }
             itemInfo.quantity = cartItems[items][item];
             orderItems.push(itemInfo);
           }
@@ -90,7 +145,8 @@ const PlaceOrder = () => {
       const orderData = {
         address: formData,
         items: orderItems,
-        amount: getCartAmount() + delivery_fee,
+        amount: getCartAmount() + delivery_fee, // The backend will recalculate discount on this base amount
+        discountCode: appliedDiscountCode,
         paymentMethod: method === "cod" ? "COD" : "Online",
         marketingConsent,
       };
@@ -224,7 +280,47 @@ const PlaceOrder = () => {
 
         {/* Right Side - Cart Total & Payment */}
         <div className="w-full lg:w-[420px] shrink-0">
-          <CartTotal />
+          <CartTotal discountPercentage={discountPercentage} discountAmount={discountAmount} />
+
+          {/* Discount Section */}
+          <div className="mt-8 bg-background p-6 vintage-border shadow-vintage">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Discount Code</h3>
+            {appliedDiscountCode ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-green-700 bg-green-100 px-2 py-1 rounded-sm text-xs">
+                    {appliedDiscountCode}
+                  </span>
+                  <span className="text-xs text-green-700 font-medium">Applied</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeDiscount}
+                  className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={discountInput}
+                  onChange={(e) => setDiscountInput(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="flex-1 bg-white border border-border px-4 py-3 outline-none focus:border-primary transition-all text-sm font-sans uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={applyDiscount}
+                  disabled={validatingDiscount}
+                  className={`bg-primary text-background px-6 font-bold tracking-widest text-xs uppercase transition-all flex items-center justify-center ${validatingDiscount ? "opacity-80" : "hover:bg-black active:scale-[0.98]"}`}
+                >
+                  {validatingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="mt-10">
             <div className="mb-6">

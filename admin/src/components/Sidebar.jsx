@@ -41,6 +41,22 @@ const Sidebar = ({ showSidebar, setShowSidebar }) => {
             <ShoppingBag size={16} className="shrink-0" />
             <p className='block'>Orders</p>
         </NavLink>
+
+        <NavLink 
+            className={({isActive}) => `flex items-center gap-3 px-4 py-3 border border-transparent transition-all uppercase tracking-widest text-xs font-bold ${isActive ? 'bg-primary text-white shadow-[2px_2px_0px_0px_rgba(26,26,26,0.3)]' : 'text-primary hover:border-primary'}`} 
+            to="/discounts"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42l-8.704-8.704z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            <p className='block'>Discounts</p>
+        </NavLink>
+
+        <NavLink 
+            className={({isActive}) => `flex items-center gap-3 px-4 py-3 border border-transparent transition-all uppercase tracking-widest text-xs font-bold ${isActive ? 'bg-primary text-white shadow-[2px_2px_0px_0px_rgba(26,26,26,0.3)]' : 'text-primary hover:border-primary'}`} 
+            to="/gallery"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <p className='block'>Gallery</p>
+        </NavLink>
     </div>
   );
 

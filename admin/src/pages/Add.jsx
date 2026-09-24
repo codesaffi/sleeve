@@ -15,9 +15,10 @@ const Add = ({token}) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("Cooling Devices");
-  const [subCategory, setSubCategory] = useState("Mobile");
+  const [category, setCategory] = useState("Wall Posters");
+  const [subCategory, setSubCategory] = useState("Premium");
   const [bestseller, setBestseller] = useState(false);
+  const [comingSoon, setComingSoon] = useState(false);
   const [sizes, setSizes] = useState([]);
   const [stock, setStock] = useState("");
 
@@ -52,6 +53,7 @@ const Add = ({token}) => {
       formData.append("bestseller", bestseller);
       formData.append("sizes", JSON.stringify(sizes));
       formData.append("stock", stock);
+      formData.append("comingSoon", comingSoon);
 
       // Filter empty spec rows before sending
       const filledSpecs = specifications.filter(
@@ -113,15 +115,17 @@ const Add = ({token}) => {
       
       <form onSubmit={onSubmitHandler} className="flex flex-col gap-8">
         {/* Images */}
-        <div className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
-          <p className="text-[10px] font-mono font-bold text-primary mb-3 uppercase tracking-[0.2em] border-b border-primary/40 pb-2">Artwork Uploads</p>
-          <div className="flex flex-wrap gap-4">
-            <ImageUploader image={image1} setImage={setImage1} id="image1" />
-            <ImageUploader image={image2} setImage={setImage2} id="image2" />
-            <ImageUploader image={image3} setImage={setImage3} id="image3" />
-            <ImageUploader image={image4} setImage={setImage4} id="image4" />
+        {!comingSoon && (
+          <div className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
+            <p className="text-[10px] font-mono font-bold text-primary mb-3 uppercase tracking-[0.2em] border-b border-primary/40 pb-2">Artwork Uploads</p>
+            <div className="flex flex-wrap gap-4">
+              <ImageUploader image={image1} setImage={setImage1} id="image1" />
+              <ImageUploader image={image2} setImage={setImage2} id="image2" />
+              <ImageUploader image={image3} setImage={setImage3} id="image3" />
+              <ImageUploader image={image4} setImage={setImage4} id="image4" />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
           {/* Product Name */}
@@ -153,62 +157,86 @@ const Add = ({token}) => {
           <div className="mt-4">
             <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Primary Classification</p>
             <select 
-              onChange={(e) => setCategory(e.target.value)} 
+              onChange={(e) => {
+                  setCategory(e.target.value);
+                  if(e.target.value === "Wall Posters") setSubCategory("Premium");
+                  if(e.target.value === "Wall Frames") {
+                      setComingSoon(true);
+                      setSubCategory("Default");
+                  } else {
+                      setComingSoon(false);
+                  }
+              }} 
               value={category}
               className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary cursor-pointer font-sans text-sm uppercase"
             >
-              <option value="Posters">Posters</option>
-              <option value="Framed Prints">Framed Prints</option>
-              <option value="Vinyl Covers">Vinyl Covers</option>
-              <option value="Canvas">Canvas</option>
+              <option value="Wall Posters">Wall Posters</option>
+              <option value="Wall Frames">Wall Frames</option>
               <option value="Archives">Archives</option>
               <option value="Misc">Misc</option>
             </select>
           </div>
 
-          {/* Platform */}
-          <div className="mt-4">
-            <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Secondary Classification</p>
-            <select 
-              onChange={(e) => setSubCategory(e.target.value)} 
-              value={subCategory}
-              className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary cursor-pointer font-sans text-sm uppercase"
-            >
-              <option value="Rock">Rock</option>
-              <option value="Pop">Pop</option>
-              <option value="Jazz">Jazz</option>
-              <option value="Indie">Indie</option>
-              <option value="Classic">Classic</option>
-              <option value="Electronic">Electronic</option>
-            </select>
-          </div>
+          {/* SubCategory */}
+          {category === "Wall Posters" && (
+              <div className="mt-4">
+                <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Secondary Classification</p>
+                <select 
+                  onChange={(e) => setSubCategory(e.target.value)} 
+                  value={subCategory}
+                  className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary cursor-pointer font-sans text-sm uppercase"
+                >
+                  <option value="Premium">Premium</option>
+                  <option value="Standard">Standard</option>
+                </select>
+              </div>
+          )}
 
-          {/* Price */}
-          <div className="mt-4">
-            <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Pricing (PKR)</p>
-            <input
-              onChange={(e) => setPrice(e.target.value)}
-              value={price}
-              className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
-              type="number"
-              placeholder="0.00"
-              required
-            />
-          </div>
-          
-          {/* Stock */}
-          <div className="mt-4">
-            <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Stock Level</p>
-            <input
-              onChange={(e) => setStock(e.target.value)}
-              value={stock}
-              className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
-              type="number"
-              min="0"
-              placeholder="0"
-              required
-            />
-          </div>
+          {category === "Wall Frames" && (
+              <div className="mt-4 flex items-center gap-3 border-2 border-primary p-3 bg-[#FAF9F6]">
+                <input
+                  type="checkbox"
+                  id="comingSoon"
+                  checked={comingSoon}
+                  onChange={(e) => setComingSoon(e.target.checked)}
+                  className="w-4 h-4 accent-primary border-primary rounded-none"
+                />
+                <label htmlFor="comingSoon" className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest cursor-pointer select-none">
+                  Mark as Coming Soon
+                </label>
+              </div>
+          )}
+
+          {!comingSoon && (
+            <>
+              {/* Price */}
+              <div className="mt-4">
+                <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Pricing (PKR)</p>
+                <input
+                  onChange={(e) => setPrice(e.target.value)}
+                  value={price}
+                  className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
+                  type="number"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              
+              {/* Stock */}
+              <div className="mt-4">
+                <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Stock Level</p>
+                <input
+                  onChange={(e) => setStock(e.target.value)}
+                  value={stock}
+                  className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </>
+          )}
 
           {/* Bestseller */}
           <div className="flex items-center gap-3 mt-6 border-2 border-primary p-3 bg-[#FAF9F6] shadow-[2px_2px_0px_0px_rgba(26,26,26,1)]">
@@ -226,65 +254,67 @@ const Add = ({token}) => {
         </div>
 
         {/* ── Product Specifications ───────────────────────────────── */}
-        <div className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest border-b border-primary/40 pb-1">Format Specifications</p>
-              <p className="text-xs text-primary/80 mt-1 font-serif italic">Include print format, framing details, year, etc.</p>
-            </div>
-          </div>
+        {!comingSoon && (
+            <div className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest border-b border-primary/40 pb-1">Format Specifications</p>
+                  <p className="text-xs text-primary/80 mt-1 font-serif italic">Include print format, framing details, year, etc.</p>
+                </div>
+              </div>
 
-          <div className="bg-[#FAF9F6] border-2 border-primary overflow-hidden">
-            {/* Header row */}
-            <div className="grid grid-cols-[1fr_1fr_44px] gap-0 px-4 py-2 border-b-2 border-primary bg-white">
-              <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Metadata Key</p>
-              <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Metadata Value</p>
-              <span></span>
-            </div>
+              <div className="bg-[#FAF9F6] border-2 border-primary overflow-hidden">
+                {/* Header row */}
+                <div className="grid grid-cols-[1fr_1fr_44px] gap-0 px-4 py-2 border-b-2 border-primary bg-white">
+                  <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Metadata Key</p>
+                  <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Metadata Value</p>
+                  <span></span>
+                </div>
 
-            {/* Spec rows */}
-            <div className="flex flex-col divide-y-2 divide-primary">
-              {specifications.map((spec, index) => (
-                <div key={index} className="grid grid-cols-[1fr_1fr_44px] gap-0 px-2 py-2 items-center">
-                  <input
-                    type="text"
-                    value={spec.name}
-                    onChange={(e) => updateSpecRow(index, 'name', e.target.value)}
-                    placeholder="e.g. Dimensions"
-                    className="bg-transparent border-none px-3 py-2 text-sm text-primary font-mono outline-none focus:bg-white transition-all mx-1 placeholder:text-primary/30"
-                  />
-                  <input
-                    type="text"
-                    value={spec.value}
-                    onChange={(e) => updateSpecRow(index, 'value', e.target.value)}
-                    placeholder="e.g. 24x36 inch"
-                    className="bg-transparent border-none px-3 py-2 text-sm text-primary font-mono outline-none focus:bg-white transition-all mx-1 placeholder:text-primary/30"
-                  />
+                {/* Spec rows */}
+                <div className="flex flex-col divide-y-2 divide-primary">
+                  {specifications.map((spec, index) => (
+                    <div key={index} className="grid grid-cols-[1fr_1fr_44px] gap-0 px-2 py-2 items-center">
+                      <input
+                        type="text"
+                        value={spec.name}
+                        onChange={(e) => updateSpecRow(index, 'name', e.target.value)}
+                        placeholder="e.g. Dimensions"
+                        className="bg-transparent border-none px-3 py-2 text-sm text-primary font-mono outline-none focus:bg-white transition-all mx-1 placeholder:text-primary/30"
+                      />
+                      <input
+                        type="text"
+                        value={spec.value}
+                        onChange={(e) => updateSpecRow(index, 'value', e.target.value)}
+                        placeholder="e.g. 24x36 inch"
+                        className="bg-transparent border-none px-3 py-2 text-sm text-primary font-mono outline-none focus:bg-white transition-all mx-1 placeholder:text-primary/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSpecRow(index)}
+                        disabled={specifications.length === 1}
+                        className="w-8 h-8 flex items-center justify-center border border-transparent text-primary hover:border-primary hover:bg-black hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors mx-auto"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add row button */}
+                <div className="px-4 py-3 border-t-2 border-primary bg-white">
                   <button
                     type="button"
-                    onClick={() => removeSpecRow(index)}
-                    disabled={specifications.length === 1}
-                    className="w-8 h-8 flex items-center justify-center border border-transparent text-primary hover:border-primary hover:bg-black hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors mx-auto"
+                    onClick={addSpecRow}
+                    className="flex items-center gap-2 text-xs font-mono font-bold text-primary uppercase tracking-widest hover:pl-2 transition-all"
                   >
-                    <X size={16} />
+                    <Plus size={14} />
+                    APPEND METADATA
                   </button>
                 </div>
-              ))}
+              </div>
             </div>
-
-            {/* Add row button */}
-            <div className="px-4 py-3 border-t-2 border-primary bg-white">
-              <button
-                type="button"
-                onClick={addSpecRow}
-                className="flex items-center gap-2 text-xs font-mono font-bold text-primary uppercase tracking-widest hover:pl-2 transition-all"
-              >
-                <Plus size={14} />
-                APPEND METADATA
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Submit */}
         <button

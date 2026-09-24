@@ -50,7 +50,7 @@ const Navbar = () => {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-8 text-xs font-semibold tracking-[0.2em] uppercase font-sans">
-            {["HOME", "COLLECTION", "ABOUT", "CONTACT"].map((item) => (
+            {["HOME", "COLLECTION", "GALLERY", "ABOUT", "CONTACT"].map((item) => (
               <NavLink 
                 key={item} 
                 to={item === "HOME" ? "/" : `/${item.toLowerCase()}`}
@@ -130,7 +130,7 @@ const Navbar = () => {
             
             <div className="flex flex-col p-6 gap-2 text-sm font-semibold tracking-widest uppercase font-sans">
               <div className="text-[10px] font-mono text-secondary mb-4 border-b border-primary/20 pb-2">VOL. 02 ★ EST. 1978</div>
-              {["HOME", "COLLECTION", "ABOUT", "CONTACT"].map((item) => (
+              {["HOME", "COLLECTION", "GALLERY", "ABOUT", "CONTACT"].map((item) => (
                 <NavLink
                   key={item}
                   onClick={() => setVisible(false)}

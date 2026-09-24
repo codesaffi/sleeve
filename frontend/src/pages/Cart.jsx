@@ -91,9 +91,18 @@ const Cart = () => {
                                 {currency} {formatPrice(productData.price)}
                               </p>
                               {item.size && (
-                                <span className="px-2 py-0.5 text-xs bg-background border border-border text-secondary">
-                                  {item.size}
-                                </span>
+                                <div className="flex flex-col gap-1 items-start mt-1">
+                                  {item.size.split('|')[0] !== "Default" && (
+                                      <span className="px-2 py-0.5 text-[10px] bg-background border border-border text-secondary font-mono uppercase tracking-widest">
+                                        Frame: {item.size.split('|')[0]}
+                                      </span>
+                                  )}
+                                  {item.size.split('|').length > 1 && (
+                                      <span className="px-2 py-0.5 text-[10px] bg-black/5 border border-primary/20 text-primary font-mono uppercase tracking-widest">
+                                        Design: {item.size.split('|')[1].split('::')[0] === 'gallery' ? 'Gallery Archive' : 'Customer Upload'}
+                                      </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>

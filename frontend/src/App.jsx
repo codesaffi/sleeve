@@ -6,6 +6,7 @@ import Footer from './components/Footer'
 import SearchBar from './components/SearchBar';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Gallery from './pages/Gallery';
 
 export const backendUrl = import.meta.env.VITE_BACKEND_URL
 export const adminUrl = import.meta.env.VITE_ADMIN_URL
@@ -19,6 +20,7 @@ function App() {
      <Navbar />
      <SearchBar />
      <Routes>
+       <Route path='/gallery' element={<Gallery />} />
      </Routes>
      <Outlet/>
      <Footer />

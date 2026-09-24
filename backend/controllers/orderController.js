@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import orderModel from "../models/orderModel.js";
 import userModel from "../models/userModel.js";
 import otpModel from "../models/otpModel.js";
+import discountModel from "../models/discountModel.js";
 import sendOrderEmail, { sendOtpEmail, sendCustomerConfirmationEmail } from "../utils/sendOrderEmail.js";
 import PDFDocument from "pdfkit-table";
 
@@ -12,13 +13,39 @@ import PDFDocument from "pdfkit-table";
 // ──────────────────────────────────────────────────────────────
 const placeOrder = async (req, res) => {
     try {
-        const { userId, items, amount, address } = req.body;
+        const { userId, items, amount, address, discountCode } = req.body;
+
+        let finalAmount = amount;
+        let discountDetails = { code: '', percentage: 0, amount: 0 };
+        let discountId = null;
+
+        if (discountCode) {
+            const normalizedCode = discountCode.trim().toUpperCase();
+            const discount = await discountModel.findOne({code: normalizedCode});
+            
+            if(!discount || !discount.isActive || discount.isUsed) {
+                return res.json({ success: false, message: "Invalid or expired discount code." });
+            }
+            
+            const discountAmount = Math.round((amount * discount.discountPercentage) / 100);
+            finalAmount = amount - discountAmount;
+            
+            discountDetails = {
+                code: discount.code,
+                percentage: discount.discountPercentage,
+                amount: discountAmount
+            };
+            discountId = discount._id;
+        }
 
         const orderData = {
             userId,
             items,
             address,
-            amount,
+            amount: finalAmount,
+            discountCode: discountDetails.code,
+            discountPercentage: discountDetails.percentage,
+            discountAmount: discountDetails.amount,
             paymentMethod: "COD",
             payment: false,
             date: Date.now()
@@ -27,10 +54,15 @@ const placeOrder = async (req, res) => {
         const newOrder = new orderModel(orderData);
         await newOrder.save();
 
+        if (discountId) {
+            await discountModel.findByIdAndUpdate(discountId, { isUsed: true });
+        }
+
         res.json({ success: true, message: "Order Placed Successfully" });
 
         // Side-effects after response
-        sendOrderEmail(req.body).catch((err) => console.error('Failed to send admin order email:', err));
+        const emailData = { ...req.body, amount: finalAmount };
+        sendOrderEmail(emailData).catch((err) => console.error('Failed to send admin order email:', err));
         userModel.findByIdAndUpdate(userId, { cartData: {} }).catch((err) => console.error('Failed to clear user cart:', err));
 
     } catch (error) {
@@ -82,7 +114,7 @@ const UpdateStatus = async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 const requestOrderVerification = async (req, res) => {
     try {
-        const { address, items, amount, paymentMethod, marketingConsent, userId } = req.body;
+        const { address, items, amount, paymentMethod, marketingConsent, userId, discountCode } = req.body;
 
         // Basic validation
         if (!address || !items || !amount || !paymentMethod) {
@@ -139,7 +171,7 @@ const requestOrderVerification = async (req, res) => {
             email,
             otpHash,
             orderRef,
-            pendingOrderData: { address, items, amount, paymentMethod, marketingConsent: !!marketingConsent, userId: userId || '' },
+            pendingOrderData: { address, items, amount, paymentMethod, marketingConsent: !!marketingConsent, userId: userId || '', discountCode: discountCode || '' },
             expiresAt,
             resendCount: 0
         });
@@ -219,7 +251,7 @@ const verifyOrderOtp = async (req, res) => {
         // OTP is correct — mark as verified immediately to prevent race condition
         await otpModel.findByIdAndUpdate(otpRecord._id, { verified: true });
 
-        const { address, items, amount, paymentMethod, marketingConsent, userId } = otpRecord.pendingOrderData;
+        const { address, items, amount, paymentMethod, marketingConsent, userId, discountCode } = otpRecord.pendingOrderData;
 
         let finalUserId = userId || '';
         
@@ -247,13 +279,40 @@ const verifyOrderOtp = async (req, res) => {
             }
         }
 
+        // Process Discount
+        let finalAmount = amount;
+        let discountDetails = { code: '', percentage: 0, amount: 0 };
+        let discountId = null;
+
+        if (discountCode) {
+            const normalizedCode = discountCode.trim().toUpperCase();
+            const discount = await discountModel.findOne({code: normalizedCode});
+            
+            if(!discount || !discount.isActive || discount.isUsed) {
+                return res.json({ success: false, message: "Discount code is no longer valid or has been used." });
+            }
+            
+            const discountAmount = Math.round((amount * discount.discountPercentage) / 100);
+            finalAmount = amount - discountAmount;
+            
+            discountDetails = {
+                code: discount.code,
+                percentage: discount.discountPercentage,
+                amount: discountAmount
+            };
+            discountId = discount._id;
+        }
+
         // Create the confirmed order
         const orderData = {
             userId: finalUserId,
             guestEmail: otpRecord.email,
             items,
             address,
-            amount,
+            amount: finalAmount,
+            discountCode: discountDetails.code,
+            discountPercentage: discountDetails.percentage,
+            discountAmount: discountDetails.amount,
             paymentMethod,
             payment: false,
             date: Date.now(),
@@ -262,6 +321,10 @@ const verifyOrderOtp = async (req, res) => {
 
         const newOrder = new orderModel(orderData);
         await newOrder.save();
+        
+        if (discountId) {
+            await discountModel.findByIdAndUpdate(discountId, { isUsed: true });
+        }
 
         // Store orderId on OTP record for reference
         await otpModel.findByIdAndUpdate(otpRecord._id, { orderId: newOrder._id.toString() });
@@ -273,11 +336,11 @@ const verifyOrderOtp = async (req, res) => {
         }
 
         // Send customer confirmation email (non-blocking)
-        sendCustomerConfirmationEmail({ address, items, amount, paymentMethod }, newOrder._id.toString())
+        sendCustomerConfirmationEmail({ address, items, amount: finalAmount, paymentMethod }, newOrder._id.toString())
             .catch((err) => console.error('Failed to send customer confirmation email:', err));
 
         // Send admin notification email (non-blocking)
-        sendOrderEmail({ address, items, amount, paymentMethod })
+        sendOrderEmail({ address, items, amount: finalAmount, paymentMethod })
             .catch((err) => console.error('Failed to send admin order email:', err));
 
         // Issue short-lived email token so they can access their profile without another OTP

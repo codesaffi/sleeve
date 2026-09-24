@@ -229,13 +229,23 @@ const Orders = ( {token} ) => {
                   </h4>
                   <div className="space-y-3">
                     {order.items.map((item, idx) => {
-                      const sizeText = item.size ? `| FORMAT: ${item.size}` : "";
+                      const sizeText = item.size && item.size !== "Default" ? `| FORMAT: ${item.size}` : "";
                       return (
-                        <div key={idx} className="flex gap-3 items-start">
+                        <div key={idx} className="flex flex-col gap-1 items-start mb-2">
                           <p className="text-sm font-serif font-bold text-primary leading-snug uppercase">
                             {item.name} 
                             <span className="text-primary/80 text-[10px] font-mono ml-2">QTY: {item.quantity} {sizeText}</span>
                           </p>
+                          {item.designSource && (
+                            <div className="text-[10px] font-mono text-primary/80 bg-black/5 px-2 py-1 border border-primary/20">
+                              <span className="font-bold uppercase tracking-widest">{item.designSource}:</span>{' '}
+                              {item.customImageUrl && (
+                                <a href={item.customImageUrl} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline ml-1">
+                                  [View Image]
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
