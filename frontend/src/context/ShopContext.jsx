@@ -56,6 +56,54 @@ const ShopContextProvider = (props) => {
     }
   };
 
+  const addMultipleToCart = async (itemId, size, customVals = []) => {
+    const product = products.find((p) => p._id === itemId);
+    if (product && product.sizes && product.sizes.length > 0 && !size) {
+      toast.error("Select Product Option");
+      return;
+    }
+
+    let cartData = structuredClone(cartItems);
+
+    for (const customVal of customVals) {
+        let optionKey = size || "Default";
+        if (customVal) {
+            optionKey = `${optionKey}|${customVal}`;
+        }
+        
+        if (cartData[itemId]) {
+            if (cartData[itemId][optionKey]) {
+                cartData[itemId][optionKey] += 1;
+            } else {
+                cartData[itemId][optionKey] = 1;
+            }
+        } else {
+            cartData[itemId] = {};
+            cartData[itemId][optionKey] = 1;
+        }
+    }
+    setCartItems(cartData);
+
+    if (token) {
+      try {
+          // Sending multiple items to the backend would require an endpoint change
+          // For now, we can loop requests or just call the add endpoint multiple times
+          // Using Promise.all to add them concurrently
+          await Promise.all(customVals.map(customVal => {
+              let optionKey = size || "Default";
+              if (customVal) optionKey = `${optionKey}|${customVal}`;
+              return axios.post(
+                  backendUrl + '/api/cart/add',
+                  { itemId, size: optionKey },
+                  { headers: { Authorization: `Bearer ${token}` } }
+              );
+          }));
+      } catch (error) {
+        toast.error(error.message);
+      }
+    }
+  };
+
   const getCartCount = () => {
     let totalCount = 0;
     for (const items in cartItems) {
@@ -190,6 +238,7 @@ const ShopContextProvider = (props) => {
     setShowSearch,
     cartItems,
     addToCart,
+    addMultipleToCart,
     setCartItems,
     getCartCount,
     updateQuantity,

@@ -15,6 +15,7 @@ import PlaceOrder from './pages/PlaceOrder.jsx'
 import Orders from './pages/Orders.jsx'
 import Profile from './pages/Profile.jsx'
 import OrderVerify from './pages/OrderVerify.jsx'
+import Gallery from './pages/Gallery.jsx'
 
 const router = createBrowserRouter([
   {
@@ -65,6 +66,10 @@ const router = createBrowserRouter([
       {
         path: "/verify-order",
         element: <OrderVerify />,
+      },
+      {
+        path: "/gallery",
+        element: <Gallery />,
       },
     ],
   },
