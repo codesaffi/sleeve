@@ -13,6 +13,7 @@ const ShopContextProvider = (props) => {
   const [cartItems, setCartItems] = useState({});
   const [products, setProducts] = useState([]);
   const [token, setToken] = useState("");
+  const GALLERY_CART_KEY = "__galleryItems";
 
   const formatPrice = (price) => new Intl.NumberFormat('en-PK').format(price);
 
@@ -104,9 +105,73 @@ const ShopContextProvider = (props) => {
     }
   };
 
+  const addGalleryToCart = async (galleryDesignId) => {
+    const cartData = structuredClone(cartItems);
+    const galleryItems = Array.isArray(cartData[GALLERY_CART_KEY]) ? cartData[GALLERY_CART_KEY] : [];
+    const existingItem = galleryItems.find((item) => item.galleryDesignId === galleryDesignId);
+
+    if (existingItem) {
+      existingItem.quantity += 1;
+    } else {
+      galleryItems.push({ galleryDesignId, productId: null, quantity: 1 });
+    }
+    cartData[GALLERY_CART_KEY] = galleryItems;
+    setCartItems(cartData);
+    localStorage.setItem("cartItems", JSON.stringify(cartData));
+
+    if (token) {
+      try {
+        await axios.post(
+          backendUrl + "/api/cart/add",
+          { galleryDesignId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+      }
+    }
+  };
+
+  const updateGalleryItem = async (galleryDesignId, productId, quantity) => {
+    const product = products.find((item) => item._id === productId);
+    if (productId && (!product || product.comingSoon)) {
+      toast.error("That product is not currently available.");
+      return;
+    }
+
+    const cartData = structuredClone(cartItems);
+    const galleryItems = Array.isArray(cartData[GALLERY_CART_KEY]) ? cartData[GALLERY_CART_KEY] : [];
+    const item = galleryItems.find((entry) => entry.galleryDesignId === galleryDesignId);
+    if (!item) return;
+
+    item.productId = productId || null;
+    item.quantity = quantity;
+    cartData[GALLERY_CART_KEY] = galleryItems.filter((entry) => entry.quantity > 0);
+    setCartItems(cartData);
+    localStorage.setItem("cartItems", JSON.stringify(cartData));
+
+    if (token) {
+      try {
+        await axios.post(
+          backendUrl + "/api/cart/update",
+          { galleryDesignId, productId: productId || null, quantity },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+      }
+    }
+  };
+
   const getCartCount = () => {
     let totalCount = 0;
     for (const items in cartItems) {
+      if (items === GALLERY_CART_KEY) {
+        for (const galleryItem of cartItems[items] || []) {
+          totalCount += galleryItem.quantity > 0 ? galleryItem.quantity : 0;
+        }
+        continue;
+      }
       for (const item in cartItems[items]) {
         try {
           if (cartItems[items][item] > 0) {
@@ -141,6 +206,15 @@ const ShopContextProvider = (props) => {
   const getCartAmount = () => {
     let totalAmount = 0;
     for (const items in cartItems) {
+      if (items === GALLERY_CART_KEY) {
+        for (const galleryItem of cartItems[items] || []) {
+          const product = products.find((item) => item._id === galleryItem.productId);
+          if (product && galleryItem.quantity > 0) {
+            totalAmount += product.price * galleryItem.quantity;
+          }
+        }
+        continue;
+      }
       let itemInfo = products.find((product) => product._id === items);
       for (const item in cartItems[items]) {
         try {
@@ -178,6 +252,7 @@ const ShopContextProvider = (props) => {
       );
       if (repsonse.data.success) {
         setCartItems(repsonse.data.cartData);
+        localStorage.setItem("cartItems", JSON.stringify(repsonse.data.cartData));
       }
     } catch (error) {
       toast.error(error.message);
@@ -192,8 +267,21 @@ const ShopContextProvider = (props) => {
     if (!token && localStorage.getItem("token")) {
       setToken(localStorage.getItem("token"));
       getUserCart(localStorage.getItem("token"));
+    } else if (!token) {
+      const savedCart = localStorage.getItem("cartItems");
+      if (savedCart) {
+        try {
+          setCartItems(JSON.parse(savedCart));
+        } catch {
+          localStorage.removeItem("cartItems");
+        }
+      }
     }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cartItems", JSON.stringify(cartItems));
+  }, [cartItems, token]);
 
   // Global interceptor to catch auth errors and log out automatically
   useEffect(() => {
@@ -239,6 +327,8 @@ const ShopContextProvider = (props) => {
     cartItems,
     addToCart,
     addMultipleToCart,
+    addGalleryToCart,
+    updateGalleryItem,
     setCartItems,
     getCartCount,
     updateQuantity,

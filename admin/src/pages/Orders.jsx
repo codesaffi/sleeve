@@ -239,6 +239,10 @@ const Orders = ( {token} ) => {
                           {item.designSource && (
                             <div className="text-[10px] font-mono text-primary/80 bg-black/5 px-2 py-1 border border-primary/20">
                               <span className="font-bold uppercase tracking-widest">{item.designSource}:</span>{' '}
+                              {item.galleryImage && (
+                                <img src={item.galleryImage} alt={item.galleryTitle || "Selected design"} className="w-12 h-12 object-cover inline-block align-middle border border-primary/30 ml-1" />
+                              )}
+                              {item.galleryTitle && <span className="ml-1">{item.galleryTitle}</span>}
                               {item.customImageUrl && (
                                 <a href={item.customImageUrl} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline ml-1">
                                   [View Image]

@@ -5,20 +5,22 @@ import CartTotal from "../components/CartTotal";
 import { useNavigate } from "react-router-dom";
 import { Trash2, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { backendUrl } from "../App";
 
 const Cart = () => {
-  const { products, currency, cartItems, updateQuantity, formatPrice } = useContext(ShopContext);
+  const { products, currency, cartItems, updateQuantity, updateGalleryItem, formatPrice } = useContext(ShopContext);
   const [cartData, setCartData] = useState([]);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [missingProduct, setMissingProduct] = useState(false);
   const navigate = useNavigate();
-
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
 
   useEffect(() => {
     if (products.length > 0) {
       const tempData = [];
       for (const items in cartItems) {
+        if (items === "__galleryItems") continue;
         for (const item in cartItems[items]) {
           if (cartItems[items][item] > 0) {
             tempData.push({
@@ -33,13 +35,33 @@ const Cart = () => {
     }
   }, [cartItems, products]);
 
+  useEffect(() => {
+    if ((cartItems.__galleryItems || []).length === 0) return;
+    axios.get(backendUrl + "/api/gallery/list")
+      .then((response) => {
+        if (response.data.success) setGalleryImages(response.data.images);
+      })
+      .catch((error) => toast.error(error.response?.data?.message || error.message));
+  }, [cartItems.__galleryItems]);
+
+  const galleryItems = cartItems.__galleryItems || [];
+  const getGallery = (id) => galleryImages.find((image) => image._id === id);
+  const proceedToCheckout = () => {
+    if (galleryItems.some((item) => !item.productId)) {
+      setMissingProduct(true);
+      toast.error("Please select a product for all your selected designs before continuing.");
+      return;
+    }
+    navigate("/place-order");
+  };
+
   return (
     <div className="pt-10 px-4 md:px-0 min-h-[70vh]">
       <div className="text-2xl mb-8">
         <Title text1={"YOUR"} text2={"CART"} />
       </div>
 
-      {cartData.length === 0 ? (
+      {cartData.length === 0 && galleryItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-secondary bg-background vintage-border shadow-vintage">
           <ShoppingBag size={64} className="mb-4 opacity-20" strokeWidth={1} />
           <h2 className="text-2xl font-serif text-primary mb-2">Your collection is empty</h2>
@@ -64,7 +86,52 @@ const Cart = () => {
 
               <div className="divide-y divide-border">
                 <AnimatePresence>
-                  {cartData.map((item, index) => {
+                  {galleryItems.map((item) => {
+                    const gallery = getGallery(item.galleryDesignId);
+                    const selectedProduct = products.find((product) => product._id === item.productId);
+                    return (
+                      <motion.div
+                        layout
+                        key={`gallery-${item.galleryDesignId}`}
+                        className={`p-4 sm:p-6 flex flex-col md:flex-row items-start gap-5 hover:bg-black/5 transition-colors ${missingProduct && !item.productId ? "bg-red-50 border-l-4 border-red-500" : ""}`}
+                      >
+                        <div className="w-24 h-24 overflow-hidden bg-white shrink-0 vintage-border p-1">
+                          <img className="w-full h-full object-cover" src={gallery?.image} alt={gallery?.title || "Gallery design"} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm sm:text-base font-serif font-bold text-primary">{gallery?.title || "Selected Gallery Design"}</p>
+                          <p className="text-xs text-secondary mt-1">Which product would you like this design printed on?</p>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {products.map((product) => (
+                              <button
+                                key={product._id}
+                                type="button"
+                                disabled={product.comingSoon}
+                                onClick={() => updateGalleryItem(item.galleryDesignId, product._id, item.quantity)}
+                                className={`border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${selectedProduct?._id === product._id ? "bg-primary text-background border-primary" : "border-border text-primary hover:border-primary"} ${product.comingSoon ? "opacity-50 cursor-not-allowed" : ""}`}
+                              >
+                                {product.name}{product.comingSoon ? " — COMING SOON" : ""}
+                              </button>
+                            ))}
+                          </div>
+                          {selectedProduct && <p className="text-xs text-primary mt-2 font-medium">Selected: {selectedProduct.name} · {currency} {formatPrice(selectedProduct.price)}</p>}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <input
+                            onChange={(event) => updateGalleryItem(item.galleryDesignId, item.productId, Math.max(1, Number(event.target.value) || 1))}
+                            className="w-16 h-10 text-center border border-border bg-background outline-none text-sm"
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                          />
+                          <button onClick={() => updateGalleryItem(item.galleryDesignId, item.productId, 0)} className="p-2 text-secondary hover:text-accent" title="Remove item">
+                            <Trash2 size={18} strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                  {cartData.map((item) => {
                     const productData = products.find((product) => product._id === item._id);
                     if (!productData) return null;
 
@@ -144,7 +211,7 @@ const Cart = () => {
           <div className="w-full lg:w-[380px] shrink-0">
             <CartTotal />
             <button
-              onClick={() => handleNavigation("/place-order")}
+              onClick={proceedToCheckout}
               className="w-full bg-primary hover:bg-black text-background font-medium tracking-wide text-sm py-4 px-8 transition-all mt-6 active:scale-[0.98]"
             >
               PROCEED TO CHECKOUT

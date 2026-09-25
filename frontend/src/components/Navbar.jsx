@@ -82,8 +82,8 @@ const Navbar = () => {
               {token && (
                 <div className="absolute right-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-48 z-50">
                   <div className="bg-white rounded-none shadow-vintage border border-primary p-2 flex flex-col overflow-hidden font-sans">
-                    <p onClick={() => navigate("/profile")} className="px-4 py-2 text-xs uppercase tracking-widest font-semibold text-primary hover:bg-black hover:text-white cursor-pointer transition-colors">My Archive</p>
-                    <p onClick={() => navigate("/orders")} className="px-4 py-2 text-xs uppercase tracking-widest font-semibold text-primary hover:bg-black hover:text-white cursor-pointer transition-colors">Collections</p>
+                    <p onClick={() => navigate("/profile")} className="px-4 py-2 text-xs uppercase tracking-widest font-semibold text-primary hover:bg-black hover:text-white cursor-pointer transition-colors">My Profile</p>
+                    <p onClick={() => navigate("/orders")} className="px-4 py-2 text-xs uppercase tracking-widest font-semibold text-primary hover:bg-black hover:text-white cursor-pointer transition-colors">My Orders</p>
                     <div className="h-px bg-primary my-1 mx-2"></div>
                     <p onClick={logout} className="px-4 py-2 text-xs uppercase tracking-widest font-semibold text-primary hover:bg-black hover:text-white cursor-pointer transition-colors">Sign Out</p>
                   </div>

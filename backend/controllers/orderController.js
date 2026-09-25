@@ -7,13 +7,62 @@ import otpModel from "../models/otpModel.js";
 import discountModel from "../models/discountModel.js";
 import sendOrderEmail, { sendOtpEmail, sendCustomerConfirmationEmail } from "../utils/sendOrderEmail.js";
 import PDFDocument from "pdfkit-table";
+import productModel from "../models/productModels.js";
+import galleryModel from "../models/galleryModel.js";
+
+const validateOrderItems = async (items) => {
+    if (!Array.isArray(items) || items.length === 0) {
+        throw new Error("Your cart is empty.");
+    }
+
+    const normalizedItems = [];
+    let total = 0;
+    for (const item of items) {
+        const quantity = Number(item.quantity);
+        const productId = item.productId || item._id;
+        if (!Number.isInteger(quantity) || quantity < 1) {
+            throw new Error("Invalid item quantity.");
+        }
+        const product = await productModel.findById(productId);
+        if (!product || product.comingSoon) {
+            throw new Error("One of the selected products is not currently available.");
+        }
+
+        const normalizedItem = {
+            ...product.toObject(),
+            productId: product._id,
+            quantity,
+            price: product.price,
+            size: item.size || "Default"
+        };
+
+        if (item.galleryDesignId) {
+            const gallery = await galleryModel.findById(item.galleryDesignId);
+            if (!gallery) throw new Error("One of the selected gallery designs no longer exists.");
+            normalizedItem.galleryDesignId = gallery._id;
+            normalizedItem.galleryTitle = gallery.title;
+            normalizedItem.galleryImage = gallery.image;
+            normalizedItem.designSource = "Gallery";
+        } else if (item.designSource || item.customImageUrl) {
+            normalizedItem.designSource = item.designSource;
+            normalizedItem.galleryImageId = item.galleryImageId;
+            normalizedItem.customImageUrl = item.customImageUrl;
+        }
+
+        normalizedItems.push(normalizedItem);
+        total += product.price * quantity;
+    }
+    return { items: normalizedItems, amount: total };
+};
 
 // ──────────────────────────────────────────────────────────────
 // EXISTING: Place order (logged-in users only — unchanged)
 // ──────────────────────────────────────────────────────────────
 const placeOrder = async (req, res) => {
     try {
-        const { userId, items, amount, address, discountCode } = req.body;
+        const { userId, items, address, discountCode } = req.body;
+        const validated = await validateOrderItems(items);
+        const amount = validated.amount;
 
         let finalAmount = amount;
         let discountDetails = { code: '', percentage: 0, amount: 0 };
@@ -40,7 +89,7 @@ const placeOrder = async (req, res) => {
 
         const orderData = {
             userId,
-            items,
+            items: validated.items,
             address,
             amount: finalAmount,
             discountCode: discountDetails.code,
@@ -114,10 +163,10 @@ const UpdateStatus = async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 const requestOrderVerification = async (req, res) => {
     try {
-        const { address, items, amount, paymentMethod, marketingConsent, userId, discountCode } = req.body;
+        const { address, items, paymentMethod, marketingConsent, userId, discountCode } = req.body;
 
         // Basic validation
-        if (!address || !items || !amount || !paymentMethod) {
+        if (!address || !items || !paymentMethod) {
             return res.json({ success: false, message: 'Missing required order information.' });
         }
 
@@ -132,6 +181,16 @@ const requestOrderVerification = async (req, res) => {
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.json({ success: false, message: 'Your cart is empty.' });
+        }
+
+        let validatedItems;
+        let validatedAmount;
+        try {
+            const validated = await validateOrderItems(items);
+            validatedItems = validated.items;
+            validatedAmount = validated.amount;
+        } catch (validationError) {
+            return res.json({ success: false, message: validationError.message });
         }
 
         // Generate a cryptographically secure 6-digit OTP
@@ -171,7 +230,7 @@ const requestOrderVerification = async (req, res) => {
             email,
             otpHash,
             orderRef,
-            pendingOrderData: { address, items, amount, paymentMethod, marketingConsent: !!marketingConsent, userId: userId || '', discountCode: discountCode || '' },
+            pendingOrderData: { address, items: validatedItems, amount: validatedAmount, paymentMethod, marketingConsent: !!marketingConsent, userId: userId || '', discountCode: discountCode || '' },
             expiresAt,
             resendCount: 0
         });

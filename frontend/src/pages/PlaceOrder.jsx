@@ -100,7 +100,20 @@ const PlaceOrder = () => {
 
   const buildOrderItems = () => {
     const orderItems = [];
+    for (const galleryItem of cartItems.__galleryItems || []) {
+      const product = products.find((entry) => entry._id === galleryItem.productId);
+      if (product && galleryItem.productId) {
+        orderItems.push({
+          ...structuredClone(product),
+          productId: product._id,
+          galleryDesignId: galleryItem.galleryDesignId,
+          designSource: "Gallery",
+          quantity: galleryItem.quantity
+        });
+      }
+    }
     for (const items in cartItems) {
+      if (items === "__galleryItems") continue;
       for (const item in cartItems[items]) {
         if (cartItems[items][item] > 0) {
           const itemInfo = structuredClone(products.find((product) => product._id === items));
@@ -139,6 +152,11 @@ const PlaceOrder = () => {
 
       if (orderItems.length === 0) {
         toast.error("Your cart is empty.");
+        return;
+      }
+
+      if ((cartItems.__galleryItems || []).some((item) => !item.productId)) {
+        toast.error("Please select a product for all your selected designs before continuing.");
         return;
       }
 

@@ -1,22 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { backendUrl } from "../App";
 import axios from "axios";
 import Title from "../components/Title";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ShopContext } from "../context/ShopContext";
 
 const Gallery = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
+    const { addGalleryToCart } = useContext(ShopContext);
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Check if we came here from a product page to select a design
-    const params = new URLSearchParams(location.search);
-    const redirectUrl = params.get("redirect");
-
     const fetchGallery = async () => {
         try {
             const response = await axios.get(backendUrl + "/api/gallery/list");
@@ -36,17 +30,9 @@ const Gallery = () => {
         fetchGallery();
     }, []);
 
-    const handleSelectImage = (image) => {
-        if (redirectUrl) {
-            // Append gallery parameters and return to the product page
-            const newUrl = redirectUrl.includes('?') 
-                ? `${redirectUrl}&galleryId=${image._id}&galleryUrl=${encodeURIComponent(image.image)}`
-                : `${redirectUrl}?galleryId=${image._id}&galleryUrl=${encodeURIComponent(image.image)}`;
-            navigate(newUrl);
-        } else {
-            // They are just browsing gallery. Go to collection page Wall Posters.
-            navigate(`/collection?category=Wall Posters&galleryId=${image._id}&galleryUrl=${encodeURIComponent(image.image)}`);
-        }
+    const handleSelectImage = async (image) => {
+        await addGalleryToCart(image._id);
+        toast.success("Design added to cart");
     };
 
     return (
@@ -56,21 +42,12 @@ const Gallery = () => {
                     <Title text1={"DESIGN"} text2={"GALLERY"} />
                 </div>
                 
-                {redirectUrl && (
-                    <button 
-                        onClick={() => navigate(redirectUrl)}
-                        className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary border border-primary px-4 py-2 hover:bg-primary hover:text-white transition-colors"
-                    >
-                        <ArrowLeft size={16} />
-                        Back to Product
-                    </button>
-                )}
             </div>
             
             <div className="mb-8 text-center max-w-2xl mx-auto">
                 <p className="text-secondary leading-relaxed">
                     Browse our curated archive of vintage inspirations. 
-                    {redirectUrl ? " Select a design below to apply it to your current poster order." : " Select a design to start customizing your poster."}
+                    {" Select a design below to save it to your cart. You can choose the product later."}
                 </p>
             </div>
 
@@ -90,7 +67,7 @@ const Gallery = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.4, delay: index * 0.05 }}
                             key={item._id} 
-                            className="bg-[#FAF9F6] border border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] group overflow-hidden flex flex-col"
+                            className=" border border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] group overflow-hidden flex flex-col"
                         >
                             <div className="relative w-full aspect-[3/4] overflow-hidden border-b border-primary">
                                 <img 
@@ -111,9 +88,9 @@ const Gallery = () => {
                                 
                                 <button
                                     onClick={() => handleSelectImage(item)}
-                                    className="w-full bg-transparent border border-primary text-primary px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white hover:border-black transition-colors"
+                                    className="w-full bg-black border border-primary text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black hover:border-black transition-colors"
                                 >
-                                    {redirectUrl ? "Select This Design" : "Use This Design"}
+                                    Add to Cart
                                 </button>
                             </div>
                         </motion.div>
