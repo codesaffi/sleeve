@@ -9,7 +9,7 @@ const CartTotal = ({ discountPercentage = 0, discountAmount = 0 }) => {
     const total = subtotal - discountAmount;
     
     return (
-        <div className='w-full bg-white border border-border p-6 rounded-2xl shadow-sm'>
+        <div className='coupon-paper w-full bg-white border border-border p-6 shadow-vintage'>
             <div className='mb-6'>
                 <h3 className='text-lg font-bold text-primary'>ORDER SUMMARY</h3>
                 <div className='w-10 h-1 bg-accent rounded-full mt-2'></div>

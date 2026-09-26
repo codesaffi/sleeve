@@ -71,11 +71,11 @@ const Gallery = () => {
             </div>
             
             {selectedCategory ? (
-                <div className="mb-8">
+                <div className="gallery-heading mb-8">
                     <button
                         type="button"
                         onClick={backToCategories}
-                        className="mb-5 text-xs font-bold uppercase tracking-widest text-primary hover:underline"
+                        className="archive-back mb-5 text-xs font-bold uppercase tracking-widest text-primary hover:underline"
                     >
                         &larr; Back to Gallery
                     </button>
@@ -108,10 +108,11 @@ const Gallery = () => {
                             transition={{ duration: 0.35, delay: index * 0.04 }}
                             key={category}
                             onClick={() => openCategory(category)}
-                            className="min-h-24 flex items-center justify-between gap-4 border border-primary bg-[#FAF9F6] px-5 py-4 text-left shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] hover:-translate-y-1 transition-transform"
+                            className="archive-category relative min-h-32 flex items-center justify-between gap-4 border border-primary bg-white px-5 py-4 text-left shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] hover:-translate-y-1 transition-transform overflow-hidden"
                         >
-                            <span className="font-serif text-lg font-bold text-primary">{category}</span>
-                            <span aria-hidden="true" className="text-xl text-primary">&rarr;</span>
+                            <span className="archive-category-title relative z-10 font-serif text-lg font-bold text-primary">{category}</span>
+                            <span aria-hidden="true" className="archive-category-arrow relative z-10 text-xl text-primary">&rarr;</span>
+                            <span className="archive-category-caption" aria-hidden="true">MUSIC ARCHIVE · SIDE A</span>
                         </motion.button>
                     ))}
                 </div>
@@ -127,7 +128,7 @@ const Gallery = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.4, delay: index * 0.05 }}
                             key={item._id} 
-                            className=" border border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] group overflow-hidden flex flex-col"
+                            className="gallery-print border border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] group overflow-hidden flex flex-col"
                         >
                             <div className="relative w-full aspect-[3/4] overflow-hidden border-b border-primary">
                                 <img 
@@ -148,7 +149,7 @@ const Gallery = () => {
                                 
                                 <button
                                     onClick={() => handleSelectImage(item)}
-                                    className="w-full bg-black border border-primary text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black hover:border-black transition-colors"
+                                    className="archive-button w-full bg-black border border-primary text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black hover:border-black transition-colors"
                                 >
                                     Add to Cart
                                 </button>

@@ -29,7 +29,7 @@ const Navbar = () => {
 
   return (
     <>
-    <header className={`sticky top-0 z-50 transition-all duration-300 border-b-2 border-primary ${scrolled ? "bg-background/95 backdrop-blur-md" : "bg-background"}`}>
+    <header className={`archive-navbar sticky top-0 z-50 transition-all duration-300 border-b-2 border-primary ${scrolled ? "bg-background/95 backdrop-blur-md" : "bg-background"}`}>
       
       {/* Editorial Top Bar */}
       <div className="border-b border-primary/20 py-1 bg-white">

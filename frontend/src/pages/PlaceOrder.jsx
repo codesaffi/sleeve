@@ -301,7 +301,7 @@ const PlaceOrder = () => {
           <CartTotal discountPercentage={discountPercentage} discountAmount={discountAmount} />
 
           {/* Discount Section */}
-          <div className="mt-8 bg-background p-6 vintage-border shadow-vintage">
+          <div className="coupon-ticket mt-8 bg-background p-6 vintage-border shadow-vintage">
             <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Discount Code</h3>
             {appliedDiscountCode ? (
               <div className="flex items-center justify-between bg-green-50 border border-green-200 p-4">
@@ -332,7 +332,7 @@ const PlaceOrder = () => {
                   type="button"
                   onClick={applyDiscount}
                   disabled={validatingDiscount}
-                  className={`bg-primary text-background px-6 font-bold tracking-widest text-xs uppercase transition-all flex items-center justify-center ${validatingDiscount ? "opacity-80" : "hover:bg-black active:scale-[0.98]"}`}
+                  className={`archive-button bg-primary text-background px-6 font-bold tracking-widest text-xs uppercase transition-all flex items-center justify-center ${validatingDiscount ? "opacity-80" : "hover:bg-black active:scale-[0.98]"}`}
                 >
                   {validatingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
                 </button>
@@ -387,7 +387,7 @@ const PlaceOrder = () => {
                 type="submit"
                 id="place-order-btn"
                 disabled={loading}
-                className={`w-full bg-primary hover:bg-black text-background font-medium tracking-wide py-4 mt-8 transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${loading ? "opacity-80 cursor-not-allowed" : ""}`}
+                className={`archive-button w-full bg-primary hover:bg-black text-background font-medium tracking-wide py-4 mt-8 transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${loading ? "opacity-80 cursor-not-allowed" : ""}`}
               >
                 {loading ? (
                   <>

@@ -307,7 +307,7 @@ const Product = () => {
 
           <div className="flex gap-4 flex-col sm:flex-row w-full mt-4">
             {productData.comingSoon ? (
-                <div className="bg-primary text-background px-8 py-4 font-bold transition-all flex items-center justify-center gap-2 shadow-vintage w-full tracking-[0.2em] uppercase cursor-not-allowed">
+                <div className="archive-stamp coming-soon-stamp bg-primary text-background px-8 py-4 font-bold transition-all flex items-center justify-center gap-2 shadow-vintage w-full tracking-[0.2em] uppercase cursor-not-allowed">
                   COMING SOON
                 </div>
             ) : (
@@ -323,7 +323,7 @@ const Product = () => {
                 <button
                   onClick={() => handleOrder(true)}
                   disabled={uploadingImage}
-                  className="bg-primary hover:bg-black text-background px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 shadow-vintage active:scale-[0.98] w-full sm:flex-1 tracking-wide disabled:opacity-70"
+                  className="archive-button bg-primary hover:bg-black text-background px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 shadow-vintage active:scale-[0.98] w-full sm:flex-1 tracking-wide disabled:opacity-70"
                 >
                   {uploadingImage ? "Processing..." : "Order Print"}
                 </button>

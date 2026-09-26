@@ -62,13 +62,13 @@ const Cart = () => {
       </div>
 
       {cartData.length === 0 && galleryItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-secondary bg-background vintage-border shadow-vintage">
+        <div className="empty-archive flex flex-col items-center justify-center py-24 text-secondary bg-background vintage-border shadow-vintage">
           <ShoppingBag size={64} className="mb-4 opacity-20" strokeWidth={1} />
           <h2 className="text-2xl font-serif text-primary mb-2">Your collection is empty</h2>
           <p className="mb-8 text-sm font-sans">Looks like you haven't added any artwork yet.</p>
           <button 
             onClick={() => navigate('/collection')}
-            className="bg-primary hover:bg-black text-background px-8 py-4 font-medium transition-colors"
+            className="archive-button bg-primary hover:bg-black text-background px-8 py-4 font-medium transition-colors"
           >
             Explore Catalogue
           </button>
@@ -93,7 +93,7 @@ const Cart = () => {
                       <motion.div
                         layout
                         key={`gallery-${item.galleryDesignId}`}
-                        className={`p-4 sm:p-6 flex flex-col md:flex-row items-start gap-5 hover:bg-black/5 transition-colors ${missingProduct && !item.productId ? "bg-red-50 border-l-4 border-red-500" : ""}`}
+                        className={`cart-print-row p-4 sm:p-6 flex flex-col md:flex-row items-start gap-5 hover:bg-black/5 transition-colors ${missingProduct && !item.productId ? "bg-red-50 border-l-4 border-red-500" : ""}`}
                       >
                         <div className="w-24 h-24 overflow-hidden bg-white shrink-0 vintage-border p-1">
                           <img className="w-full h-full object-cover" src={gallery?.image} alt={gallery?.title || "Gallery design"} />
@@ -143,7 +143,7 @@ const Cart = () => {
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
                         key={`${item._id}-${item.size}`}
-                        className="p-4 sm:p-6 grid grid-cols-[1fr_auto] sm:grid-cols-[4fr_1fr_1fr] items-center gap-4 sm:gap-6 hover:bg-black/5 transition-colors"
+                        className="cart-print-row p-4 sm:p-6 grid grid-cols-[1fr_auto] sm:grid-cols-[4fr_1fr_1fr] items-center gap-4 sm:gap-6 hover:bg-black/5 transition-colors"
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-20 h-20 sm:w-24 sm:h-24 overflow-hidden bg-white shrink-0 vintage-border p-1">
@@ -212,7 +212,7 @@ const Cart = () => {
             <CartTotal />
             <button
               onClick={proceedToCheckout}
-              className="w-full bg-primary hover:bg-black text-background font-medium tracking-wide text-sm py-4 px-8 transition-all mt-6 active:scale-[0.98]"
+              className="archive-button w-full bg-primary hover:bg-black text-background font-medium tracking-wide text-sm py-4 px-8 transition-all mt-6 active:scale-[0.98]"
             >
               PROCEED TO CHECKOUT
             </button>

@@ -25,7 +25,7 @@ const App = () => {
   },[token])
 
   return (
-    <div className='bg-background halftone-bg min-h-screen text-primary'>
+    <div className='admin-shell bg-background halftone-bg min-h-screen text-primary'>
       <ToastContainer />
       {token === ''
       ? <Login setToken={setToken} />

@@ -7,20 +7,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#FAF9F6', // Warm paper/cream
-        primary: '#1A1A1A',    // Charcoal text
-        secondary: '#4A4A4A',  // Muted text
-        border: '#D1CFC7',     // Thin charcoal/muted gray
-        accent: '#7C2D33',     // Muted burgundy
-        accentHover: '#5C1F25',
-        forest: '#2D4A3E',     // Dark forest green
+        background: '#F1E8D8',
+        primary: '#29251F',
+        secondary: '#62594E',
+        border: '#C8BCA8',
+        white: '#F8F2E7',
+        accent: '#8E3D36',
+        accentHover: '#713029',
+        forest: '#354D3F',
+        ochre: '#B1843F',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        serif: ['"Playfair Display"', 'serif'],
+        sans: ['"DM Sans"', 'sans-serif'],
+        serif: ['"DM Serif Display"', 'serif'],
+        handwritten: ['"Caveat"', 'cursive'],
       },
       boxShadow: {
-        'vintage': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+        vintage: '3px 4px 0 rgba(41, 37, 31, 0.12), 0 10px 24px rgba(41, 37, 31, 0.06)',
       }
     },
   },
