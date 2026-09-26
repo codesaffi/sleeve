@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { backendUrl } from '../App';
 import { toast } from 'react-toastify';
@@ -9,9 +9,14 @@ const Gallery = ({ token }) => {
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     
-    const [image, setImage] = useState(false);
+    const [files, setFiles] = useState([]);
+    const [category, setCategory] = useState('');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [fileInputKey, setFileInputKey] = useState(0);
+    const previewUrls = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
+
+    useEffect(() => () => previewUrls.forEach((url) => URL.revokeObjectURL(url)), [previewUrls]);
     
     const fetchImages = async () => {
         try {
@@ -32,15 +37,25 @@ const Gallery = ({ token }) => {
 
     const onSubmitHandler = async (e) => {
         e.preventDefault();
-        if (!image) {
-            toast.error("Please select an image");
+        const normalizedCategory = category.trim();
+        if (!normalizedCategory) {
+            toast.error("Please enter a category name");
+            return;
+        }
+        if (files.length === 0) {
+            toast.error("Please select at least one image");
+            return;
+        }
+        if (files.length > 10) {
+            toast.error("You can upload a maximum of 10 images at a time.");
             return;
         }
         
         setLoading(true);
         try {
             const formData = new FormData();
-            formData.append("image", image);
+            files.forEach((file) => formData.append("images", file));
+            formData.append("category", normalizedCategory);
             formData.append("title", title);
             formData.append("description", description);
             
@@ -50,17 +65,28 @@ const Gallery = ({ token }) => {
             
             if (response.data.success) {
                 toast.success(response.data.message);
-                setImage(false);
+                setFiles([]);
+                setCategory('');
                 setTitle('');
                 setDescription('');
+                setFileInputKey((key) => key + 1);
                 fetchImages();
             } else {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.response?.data?.message || error.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
+    };
+
+    const onFilesSelected = (event) => {
+        const selectedFiles = Array.from(event.target.files || []);
+        if (selectedFiles.length > 10) {
+            toast.error("You can upload a maximum of 10 images at a time.");
+        }
+        setFiles(selectedFiles);
     };
 
     const removeImage = async (id) => {
@@ -88,28 +114,55 @@ const Gallery = ({ token }) => {
             
             {/* Create Form */}
             <div className="bg-[#FAF9F6] p-6 shadow-[8px_8px_0px_0px_rgba(26,26,26,1)] border-2 border-primary relative">
-                <div className="absolute top-4 right-4 text-[10px] font-mono tracking-widest text-primary uppercase border border-primary px-2 py-1 bg-white">UPLOAD 01</div>
-                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-primary mb-6 pb-2 border-b border-primary/40">Upload Inspiration</h2>
+                <div className="absolute top-4 right-4 text-[10px] font-mono tracking-widest text-primary uppercase border border-primary px-2 py-1 bg-white">UPLOAD 10</div>
+                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-primary mb-6 pb-2 border-b border-primary/40">Upload Gallery Images</h2>
                 
                 <form onSubmit={onSubmitHandler} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     
                     <div className="md:col-span-1">
-                        <p className="text-[10px] font-mono font-bold text-primary mb-2 uppercase tracking-widest">Image File</p>
-                        <label htmlFor="image" className="cursor-pointer group block">
-                            <div className={`w-full aspect-square border-2 flex items-center justify-center overflow-hidden transition-all ${!image ? 'border-dashed border-primary/40 bg-white group-hover:border-primary group-hover:bg-black/5' : 'border-solid border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]'}`}>
-                                {!image ? (
-                                    <div className="flex flex-col items-center text-primary/40 group-hover:text-primary transition-colors">
-                                        <Upload size={24} />
-                                    </div>
-                                ) : (
-                                    <img className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1]" src={URL.createObjectURL(image)} alt="preview" />
-                                )}
+                        <p className="text-[10px] font-mono font-bold text-primary mb-2 uppercase tracking-widest">Select Images</p>
+                        <label htmlFor="gallery-images" className="cursor-pointer group block">
+                            <div className="w-full min-h-32 border-2 border-dashed border-primary/40 bg-white group-hover:border-primary group-hover:bg-black/5 flex flex-col items-center justify-center gap-2 p-4 transition-all">
+                                <Upload size={24} className="text-primary/60" />
+                                <span className="text-xs font-bold uppercase tracking-widest text-primary">Choose Images</span>
+                                <span className="text-[10px] text-primary/60">Maximum 10 images</span>
                             </div>
-                            <input onChange={(e) => setImage(e.target.files[0])} type="file" id="image" hidden />
+                            <input
+                                key={fileInputKey}
+                                onChange={onFilesSelected}
+                                type="file"
+                                id="gallery-images"
+                                accept="image/*"
+                                multiple
+                                hidden
+                            />
                         </label>
+                        <p className={`mt-2 text-xs font-mono ${files.length > 10 ? 'text-red-600' : 'text-primary/70'}`}>
+                            Selected Images: {files.length}/10
+                        </p>
                     </div>
 
                     <div className="md:col-span-2 flex flex-col gap-4">
+                        {previewUrls.length > 0 && (
+                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                {previewUrls.map((url, index) => (
+                                    <img key={url} src={url} alt={`Selected gallery image ${index + 1}`} className="w-full aspect-square object-cover border border-primary" />
+                                ))}
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="text-[10px] font-mono font-bold text-primary mb-1 block uppercase tracking-widest">Category Name</label>
+                            <input
+                                type="text"
+                                required
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                placeholder="e.g. Arctic Monkeys"
+                                className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-serif text-lg placeholder:text-primary/30"
+                            />
+                        </div>
+
                         <div>
                             <label className="text-[10px] font-mono font-bold text-primary mb-1 block uppercase tracking-widest">Title (Optional)</label>
                             <input
@@ -136,7 +189,7 @@ const Gallery = ({ token }) => {
                             disabled={loading}
                             className={`w-full sm:w-auto self-start mt-2 bg-primary text-white py-3 px-8 font-bold tracking-widest text-[10px] uppercase transition-all flex items-center justify-center gap-2 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] active:translate-y-1 active:shadow-none hover:-translate-y-1 border border-primary ${loading ? 'opacity-80' : 'hover:bg-black'}`}
                         >
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Upload size={14} /> ADD TO GALLERY</>}
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Upload size={14} /> UPLOAD</>}
                         </button>
                     </div>
                 </form>
@@ -172,6 +225,8 @@ const Gallery = ({ token }) => {
                                 <div className="mt-2 pt-2 border-t border-primary/20">
                                     <p className="text-xs font-bold text-primary truncate" title={item.title}>{item.title || "Untitled"}</p>
                                     <p className="text-[10px] text-primary/60 truncate" title={item.description}>{item.description || "No description"}</p>
+                                    <p className="text-[10px] font-bold text-primary truncate mt-1" title={item.category}>{item.category || "Uncategorized"}</p>
+                                    {item.createdAt && <p className="text-[10px] text-primary/50 mt-1">{new Date(item.createdAt).toLocaleDateString()}</p>}
                                 </div>
                             </motion.div>
                         ))

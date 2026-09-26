@@ -4,6 +4,7 @@ const gallerySchema = new mongoose.Schema({
     image: { type: String, required: true },
     title: { type: String, default: "" },
     description: { type: String, default: "" },
+    category: { type: String, default: "" },
 }, { timestamps: true });
 
 const galleryModel = mongoose.models.gallery || mongoose.model("gallery", gallerySchema);
