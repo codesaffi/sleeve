@@ -99,6 +99,9 @@ const Navbar = () => {
             </Link>
 
             <button 
+              type="button"
+              aria-label="Open navigation menu"
+              aria-expanded={visible}
               onClick={() => setVisible(true)} 
               className="md:hidden text-primary hover:scale-110 transition-transform ml-2"
             >
@@ -120,10 +123,10 @@ const Navbar = () => {
             className="fixed inset-0 z-[100] bg-background texture-overlay flex flex-col"
           >
             <div className="flex items-center justify-between p-6 border-b border-primary bg-white">
-              <div className="flex items-center gap-2">
+              <Link to="/" onClick={() => setVisible(false)} className="flex items-center gap-2">
                 <span className="font-serif font-bold text-2xl tracking-tighter text-primary">Sleeve<span className="italic">.</span></span>
-              </div>
-              <button onClick={() => setVisible(false)} className="text-primary hover:scale-110 transition-transform p-2">
+              </Link>
+              <button type="button" aria-label="Close navigation menu" onClick={() => setVisible(false)} className="text-primary hover:scale-110 transition-transform p-2">
                 <X size={24} strokeWidth={1.5} />
               </button>
             </div>
