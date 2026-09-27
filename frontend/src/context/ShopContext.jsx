@@ -106,18 +106,19 @@ const ShopContextProvider = (props) => {
   };
 
   const addGalleryToCart = async (galleryDesignId) => {
-    const cartData = structuredClone(cartItems);
-    const galleryItems = Array.isArray(cartData[GALLERY_CART_KEY]) ? cartData[GALLERY_CART_KEY] : [];
-    const existingItem = galleryItems.find((item) => item.galleryDesignId === galleryDesignId);
+    setCartItems((currentCartItems) => {
+      const cartData = structuredClone(currentCartItems);
+      const galleryItems = Array.isArray(cartData[GALLERY_CART_KEY]) ? cartData[GALLERY_CART_KEY] : [];
+      const existingItem = galleryItems.find((item) => item.galleryDesignId === galleryDesignId);
 
-    if (existingItem) {
-      existingItem.quantity += 1;
-    } else {
-      galleryItems.push({ galleryDesignId, productId: null, quantity: 1 });
-    }
-    cartData[GALLERY_CART_KEY] = galleryItems;
-    setCartItems(cartData);
-    localStorage.setItem("cartItems", JSON.stringify(cartData));
+      if (existingItem) {
+        existingItem.quantity += 1;
+      } else {
+        galleryItems.push({ galleryDesignId, productId: null, quantity: 1 });
+      }
+      cartData[GALLERY_CART_KEY] = galleryItems;
+      return cartData;
+    });
 
     if (token) {
       try {
