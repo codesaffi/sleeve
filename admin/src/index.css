@@ -4,6 +4,15 @@
 @tailwind utilities;
 
 @layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    line-height: 1.35;
+  }
+
   body {
     @apply bg-background text-primary font-sans antialiased;
     background-image:
@@ -87,6 +96,38 @@ button, a, input, select, textarea {
 
 .admin-shell [class*="shadow-"] {
   border-radius: 2px 5px 3px 4px;
+}
+
+.Toastify__toast-container {
+  z-index: 1100 !important;
+  width: min(24rem, calc(100vw - 1rem));
+  padding: 0;
+}
+
+.Toastify__toast {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell.halftone-bg > .Toastify {
+  position: fixed;
+  z-index: 1100;
+}
+
+@media (max-width: 640px) {
+  .Toastify__toast-container--top-right {
+    top: auto;
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    right: 0.5rem;
+    left: auto;
+    width: min(24rem, calc(100vw - 1rem));
+  }
+
+  .Toastify__toast {
+    margin-bottom: 0.5rem;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.875rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

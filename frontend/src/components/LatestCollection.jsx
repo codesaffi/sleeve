@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useMemo } from "react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "./Title";
 import ProductItem from "./ProductItem";
@@ -6,11 +6,7 @@ import { motion } from "framer-motion";
 
 const LatestCollection = () => {
   const { products } = useContext(ShopContext);
-  const [latestProducts, setLatestProducts] = useState([]);
-
-  useEffect(() => {
-    setLatestProducts(products.slice(0, 10));
-  }, [products]);
+  const latestProducts = useMemo(() => products.slice(0, 10), [products]);
 
   return (
     <div className="py-16 md:py-24 bg-background border-t border-border mt-10">
@@ -35,6 +31,11 @@ const LatestCollection = () => {
             image={item.image}
             name={item.name}
             price={item.price}
+            category={item.category}
+            subCategory={item.subCategory}
+            minimumPosterQuantity={item.minimumPosterQuantity}
+            basePosterQuantity={item.basePosterQuantity}
+            basePosterPrice={item.basePosterPrice}
           />
         ))}
       </motion.div>

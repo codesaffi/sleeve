@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import { useContext, useMemo } from 'react';
 import { ShopContext } from '../context/ShopContext';
 import Title from './Title';
 import ProductItem from './ProductItem';
@@ -6,16 +6,9 @@ import { motion } from 'framer-motion';
 
 const RelatedProducts = ({category, subCategory}) => {
     const { products } = useContext(ShopContext);
-    const [related, setRelated] = useState([]);
-
-    useEffect(() => {
-        if (products.length > 0) {
-            let productsCopy = products.slice();
-            productsCopy = productsCopy.filter((item) => category === item.category);
-            productsCopy = productsCopy.filter((item) => subCategory === item.subCategory);
-            setRelated(productsCopy.slice(0,5));
-        }
-    }, [products, category, subCategory]);
+    const related = useMemo(() => products
+        .filter((item) => category === item.category && subCategory === item.subCategory)
+        .slice(0, 5), [products, category, subCategory]);
 
     return (
         <div className='mt-24'>
@@ -31,7 +24,7 @@ const RelatedProducts = ({category, subCategory}) => {
                 className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6'
             >
                 {related.map((item, index) => (
-                    <ProductItem key={index} id={item._id} name={item.name} price={item.price} image={item.image} />
+                    <ProductItem key={index} id={item._id} name={item.name} price={item.price} image={item.image} category={item.category} subCategory={item.subCategory} minimumPosterQuantity={item.minimumPosterQuantity} basePosterQuantity={item.basePosterQuantity} basePosterPrice={item.basePosterPrice} />
                 ))}
             </motion.div>
         </div>

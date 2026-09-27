@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ShopContext } from "../context/ShopContext";
 import { backendUrl } from "../App";
@@ -8,15 +8,20 @@ import Reviews from "../components/Reviews";
 import SizeChart from "../components/SizeChart";
 import { motion } from "framer-motion";
 import { Star, ShieldCheck, Truck, RefreshCcw, ShoppingCart, X } from "lucide-react";
-import axios from "axios";
+import { toast } from "react-toastify";
+import { cloudinaryImageUrl } from "../utils/imageUrl";
+import { getPosterMinimum, getPosterPrice, isPosterProduct } from "../utils/posterPricing";
 
 const Product = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
-  const { products, currency, addToCart, addMultipleToCart, formatPrice } = useContext(ShopContext);
+  const { products, productsLoading, currency, addToCart, addMultipleToCart, addPosterBatch, formatPrice, galleryImages, getGalleryData } = useContext(ShopContext);
   const [productData, setProductData] = useState(false);
   const [image, setImage] = useState("");
   const [size, setSize] = useState("");
+  const [selectedPosterQuantity, setSelectedPosterQuantity] = useState(1);
+  const [customPosterQuantity, setCustomPosterQuantity] = useState("");
+  const [useCustomPosterQuantity, setUseCustomPosterQuantity] = useState(false);
   const [showDescription, setShowDescription] = useState("description");
 
   // Customization states
@@ -26,7 +31,6 @@ const Product = () => {
   
   // Gallery modal states
   const [showGalleryModal, setShowGalleryModal] = useState(false);
-  const [galleryImagesList, setGalleryImagesList] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
 
   // Check URL params for pre-selected gallery design
@@ -39,44 +43,86 @@ const Product = () => {
     }
   }, []);
 
-  const fetchProductData = async () => {
-    products.map((item) => {
-      if (item._id === productId) {
-        setProductData(item);
-        setImage(item.image[0]);
-        return null;
-      }
-    });
-  };
+  useEffect(() => {
+    const item = products.find((product) => product._id === productId);
+    if (!item) return;
+    setProductData(item);
+    setImage(item.image[0]);
+    if (isPosterProduct(item)) {
+      const minimum = getPosterMinimum(item);
+      setSelectedPosterQuantity(minimum);
+      setCustomPosterQuantity(String(minimum));
+      setUseCustomPosterQuantity(false);
+    }
+  }, [productId, products]);
 
   const fetchGallery = async () => {
-    if (galleryImagesList.length > 0) return;
+    if (galleryImages.length > 0) return;
     setGalleryLoading(true);
     try {
-        const response = await axios.get(backendUrl + "/api/gallery/list");
-        if (response.data.success) {
-            setGalleryImagesList(response.data.images);
-        }
+        await getGalleryData();
     } catch (error) {
-        console.error("Error fetching gallery:", error);
+        toast.error(error.response?.data?.message || error.message);
     } finally {
         setGalleryLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchProductData();
-  }, [productId, products]);
-
   const handleOrder = async (redirect = false) => {
-    let customVals = [];
-    if (productData.category === "Wall Posters") {
-        if (customImages.length === 0 && gallerySelections.length === 0) {
-            alert("Please upload at least one image or select from the gallery.");
+    if (isPosterProduct(productData)) {
+        const designCount = customImages.length + gallerySelections.length;
+        if (designCount !== selectedPosterQuantity) {
+            toast.error(`You selected ${selectedPosterQuantity} posters. Please provide exactly ${selectedPosterQuantity} designs.`);
             return;
         }
         if (productData.sizes && productData.sizes.length > 0 && !size) {
-            alert("Please select a frame size.");
+            toast.error("Please select a frame size.");
+            return;
+        }
+
+        setUploadingImage(true);
+        try {
+            const uploadedDesigns = await Promise.all(customImages.map(async (img) => {
+                const formData = new FormData();
+                formData.append("image", img);
+                const response = await fetch(`${backendUrl}/api/upload/custom`, { method: "POST", body: formData });
+                const result = await response.json();
+                if (!response.ok || !result.success || !result.imageUrl) {
+                    throw new Error(result.message || "Image upload failed.");
+                }
+                return { type: "upload", imageUrl: result.imageUrl };
+            }));
+            const designs = [
+                ...uploadedDesigns,
+                ...gallerySelections.map((selection) => ({
+                    type: "gallery",
+                    galleryDesignId: selection.id,
+                    imageUrl: selection.url,
+                })),
+            ];
+            const added = await addPosterBatch({
+                productId: productData._id,
+                size: productData.sizes?.length ? size : "Default",
+                posterQuantity: selectedPosterQuantity,
+                designs,
+            });
+            if (added && redirect) navigate("/cart");
+        } catch (error) {
+            toast.error(error.message || "Image upload failed. Please try again.");
+        } finally {
+            setUploadingImage(false);
+        }
+        return;
+    }
+
+    let customVals = [];
+    if (productData.category === "Wall Posters") {
+        if (customImages.length === 0 && gallerySelections.length === 0) {
+            toast.error("Please upload at least one image or select from the gallery.");
+            return;
+        }
+        if (productData.sizes && productData.sizes.length > 0 && !size) {
+            toast.error("Please select a frame size.");
             return;
         }
 
@@ -106,8 +152,8 @@ const Product = () => {
                     customVals.push(`gallery::${sel.id}::${sel.url}`);
                 });
             }
-        } catch (e) {
-            alert("Upload error");
+        } catch {
+            toast.error("Image upload failed. Please try again.");
             setUploadingImage(false);
             return;
         }
@@ -115,7 +161,7 @@ const Product = () => {
         setUploadingImage(false);
     } else {
         if (productData.sizes && productData.sizes.length > 0 && !size) {
-            alert("Please select a size.");
+            toast.error("Please select a size.");
             return;
         }
     }
@@ -124,7 +170,8 @@ const Product = () => {
         await addMultipleToCart(
             productData._id,
             productData.sizes && productData.sizes.length > 0 ? size : undefined,
-            customVals
+            customVals,
+            isPosterProduct(productData) ? selectedPosterQuantity : null
         );
     } else {
         await addToCart(
@@ -153,15 +200,32 @@ const Product = () => {
             {productData.image.map((item, index) => (
               <img
                 onClick={() => setImage(item)}
-                src={item}
+                src={cloudinaryImageUrl(item, 240)}
                 key={index}
                 className={`w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] object-cover flex-shrink-0 cursor-pointer border transition-all ${image === item ? 'border-primary p-0.5' : 'border-transparent hover:border-border'}`}
                 alt="thumbnail"
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                onError={(event) => {
+                  if (!event.currentTarget.dataset.fallback) {
+                    event.currentTarget.dataset.fallback = "true";
+                    event.currentTarget.src = item;
+                  } else {
+                    event.currentTarget.onerror = null;
+                  }
+                }}
               />
             ))}
           </div>
           <div className="w-full flex-1 vintage-border bg-white p-4 flex items-center justify-center relative group shadow-vintage overflow-hidden">
-            <img className="w-full h-auto max-h-[600px] object-contain group-hover:scale-105 transition-transform duration-700" src={image} alt="product" />
+            <img className="w-full h-auto max-h-[600px] object-contain group-hover:scale-105 transition-transform duration-700" src={cloudinaryImageUrl(image, 1400)} alt="product" fetchpriority="high" decoding="async" onError={(event) => {
+              if (!event.currentTarget.dataset.fallback) {
+                event.currentTarget.dataset.fallback = "true";
+                event.currentTarget.src = image;
+              } else {
+                event.currentTarget.onerror = null;
+              }
+            }} />
           </div>
         </div>
 
@@ -185,13 +249,56 @@ const Product = () => {
               <p className="mt-8 text-2xl font-bold text-primary tracking-widest uppercase">COMING SOON</p>
           ) : (
               <p className="mt-8 text-3xl font-medium text-primary">
-                {currency} {formatPrice(productData.price)}
+                {currency} {formatPrice(isPosterProduct(productData) ? (getPosterPrice(productData, selectedPosterQuantity) ?? productData.price) : productData.price)}
               </p>
           )}
           
           <p className="mt-6 text-secondary text-base leading-relaxed font-sans max-w-lg">
             {productData.description}
           </p>
+
+          {!productData.comingSoon && isPosterProduct(productData) && (
+            <section className="mt-6 w-full max-w-lg border border-primary bg-[#FAF9F6] p-4 sm:p-5" aria-label="Poster quantity">
+              <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-primary">Choose Quantity</h2>
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2].map((offset) => {
+                  const quantity = getPosterMinimum(productData) + offset;
+                  return (
+                    <button key={quantity} type="button" onClick={() => {
+                      setSelectedPosterQuantity(quantity);
+                      setUseCustomPosterQuantity(false);
+                    }} className={`min-h-10 border px-4 py-2 text-sm font-semibold ${!useCustomPosterQuantity && selectedPosterQuantity === quantity ? "border-primary bg-primary text-background" : "border-border text-primary hover:border-primary"}`}>
+                      {quantity} PCS
+                    </button>
+                  );
+                })}
+                <button type="button" onClick={() => {
+                  setUseCustomPosterQuantity(true);
+                  setCustomPosterQuantity(String(selectedPosterQuantity));
+                }} className={`min-h-10 border px-4 py-2 text-sm font-semibold ${useCustomPosterQuantity ? "border-primary bg-primary text-background" : "border-border text-primary hover:border-primary"}`}>
+                  CUSTOM
+                </button>
+              </div>
+              {useCustomPosterQuantity && (
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <label className="sr-only" htmlFor="custom-poster-quantity">Custom quantity</label>
+                  <input id="custom-poster-quantity" type="number" min={getPosterMinimum(productData)} step="1" value={customPosterQuantity} onChange={(event) => setCustomPosterQuantity(event.target.value)} placeholder="Enter quantity" className="w-full min-w-0 flex-1 border border-border bg-white px-3 py-2 text-sm" />
+                  <button type="button" onClick={() => {
+                    const quantity = Number(customPosterQuantity);
+                    if (!Number.isInteger(quantity) || quantity < getPosterMinimum(productData)) {
+                      toast.error(`Minimum order quantity is ${getPosterMinimum(productData)} posters.`);
+                      return;
+                    }
+                    setSelectedPosterQuantity(quantity);
+                  }} className="min-h-10 border border-primary bg-white px-5 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white">Apply</button>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-secondary">Minimum order: {getPosterMinimum(productData)} posters</p>
+              <p className="mt-1 font-serif text-lg font-bold text-primary" aria-live="polite">
+                {selectedPosterQuantity} PCS — {currency} {formatPrice(getPosterPrice(productData, selectedPosterQuantity) ?? productData.price)}
+              </p>
+            </section>
+          )}
           
           <div className="flex flex-col gap-4 my-8">
             {!productData.comingSoon && productData.sizes && productData.sizes.length > 0 && (
@@ -220,37 +327,48 @@ const Product = () => {
                 <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-primary mb-4 border-b-2 border-primary/40 pb-2">Poster Design Source</h3>
                 
                 {/* Premium can upload */}
-                {productData.subCategory === "Premium" && (
+                {isPosterProduct(productData) && (
                     <div className="mb-4">
-                        <label className="text-xs font-bold text-primary uppercase tracking-widest block mb-2">Upload Your Images (Multiple Allowed)</label>
+                        <label htmlFor="poster-design-uploads" className="text-xs font-bold text-primary uppercase tracking-widest block mb-2">
+                          Custom Designs — Upload exactly {selectedPosterQuantity} designs
+                        </label>
+                        <p className="mb-2 text-xs text-secondary">
+                          {selectedPosterQuantity} PCS → {selectedPosterQuantity} designs required
+                        </p>
                         <input 
+                            id="poster-design-uploads"
                             type="file" 
                             accept="image/*"
                             multiple
+                            disabled={customImages.length + gallerySelections.length >= selectedPosterQuantity}
                             onChange={(e) => {
-                                setCustomImages([...customImages, ...Array.from(e.target.files)]);
+                                const selectedFiles = Array.from(e.target.files || []);
+                                e.target.value = "";
+                                if (customImages.length + gallerySelections.length + selectedFiles.length > selectedPosterQuantity) {
+                                    toast.error(`You selected ${selectedPosterQuantity} posters. Please provide exactly ${selectedPosterQuantity} designs.`);
+                                    return;
+                                }
+                                if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
+                                    toast.error("Please select image files only.");
+                                    return;
+                                }
+                                setCustomImages((currentImages) => [...currentImages, ...selectedFiles]);
                             }}
-                            className="block w-full text-sm text-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-black cursor-pointer border border-primary p-1 bg-white"
+                            className="block w-full min-w-0 border border-primary bg-white p-1 text-sm text-primary file:mr-4 file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-black disabled:opacity-50"
                         />
-                        {customImages.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {customImages.map((img, idx) => (
-                                    <div key={idx} className="relative border border-primary p-1 bg-white flex items-center pr-6">
-                                        <p className="text-xs truncate w-20 px-1">{img.name}</p>
-                                        <button onClick={() => setCustomImages(customImages.filter((_, i) => i !== idx))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 shadow-sm">
-                                            <X size={12} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {customImages.map((img, idx) => (
+                          <div key={`${img.name}-${img.lastModified}-${idx}`} className="mt-2 flex items-center justify-between gap-2 border border-primary/30 bg-white px-2 py-1 text-xs">
+                            <span className="min-w-0 truncate">{img.name}</span>
+                            <button type="button" aria-label={`Remove uploaded design ${idx + 1}`} onClick={() => setCustomImages((currentImages) => currentImages.filter((_, imageIndex) => imageIndex !== idx))} className="shrink-0 text-primary hover:text-accent"><X size={14} /></button>
+                          </div>
+                        ))}
                     </div>
                 )}
                 
                 {/* Premium & Standard can choose from gallery */}
                 <div className="mt-4">
                     <label className="text-xs font-bold text-primary uppercase tracking-widest block mb-2">
-                        Choose From Gallery (Multiple Allowed)
+                        Choose From Gallery ({selectedPosterQuantity - customImages.length} more available)
                     </label>
                     <button 
                         onClick={() => {
@@ -266,7 +384,7 @@ const Product = () => {
                         <div className="border border-primary p-4 bg-white mb-4 max-h-64 overflow-y-auto">
                             {galleryLoading ? <p className="text-xs text-primary font-bold">Loading gallery...</p> : (
                                 <div className="grid grid-cols-3 gap-2">
-                                    {galleryImagesList.map(gImg => {
+                                    {galleryImages.map(gImg => {
                                         const isSelected = gallerySelections.find(s => s.id === gImg._id);
                                         return (
                                             <div 
@@ -276,11 +394,15 @@ const Product = () => {
                                                     if (isSelected) {
                                                         setGallerySelections(gallerySelections.filter(s => s.id !== gImg._id));
                                                     } else {
+                                                        if (customImages.length + gallerySelections.length >= selectedPosterQuantity) {
+                                                            toast.error(`You selected ${selectedPosterQuantity} posters. Please provide exactly ${selectedPosterQuantity} designs.`);
+                                                            return;
+                                                        }
                                                         setGallerySelections([...gallerySelections, { id: gImg._id, url: gImg.image }]);
                                                     }
                                                 }}
                                             >
-                                                <img src={gImg.image} alt={gImg.title} className="w-full h-24 object-cover" />
+                                                <img src={cloudinaryImageUrl(gImg.image, 240)} alt={gImg.title} loading="lazy" decoding="async" className="w-full h-24 object-cover" />
                                             </div>
                                         )
                                     })}
@@ -300,6 +422,19 @@ const Product = () => {
                                 </div>
                             ))}
                         </div>
+                    )}
+                    {isPosterProduct(productData) && (
+                      <>
+                        <p className={`mt-3 text-xs font-semibold ${customImages.length + gallerySelections.length === selectedPosterQuantity ? "text-green-700" : "text-secondary"}`} aria-live="polite">
+                          Selected: {customImages.length + gallerySelections.length} / {selectedPosterQuantity} designs
+                          {customImages.length + gallerySelections.length === selectedPosterQuantity ? " — designs ready" : ""}
+                        </p>
+                        {customImages.length + gallerySelections.length !== selectedPosterQuantity && (
+                          <p className="mt-1 text-xs text-accent">
+                            You selected {selectedPosterQuantity} posters. Please provide exactly {selectedPosterQuantity} designs.
+                          </p>
+                        )}
+                      </>
                     )}
                 </div>
             </div>
@@ -391,7 +526,9 @@ const Product = () => {
       />
     </motion.div>
   ) : (
-    <div className="min-h-screen"></div>
+    <div className="min-h-[50vh] px-4 py-24 text-center text-secondary" role="status">
+      {productsLoading ? "Loading product…" : "Product not found."}
+    </div>
   );
 };
 

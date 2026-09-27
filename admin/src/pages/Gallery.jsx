@@ -4,10 +4,12 @@ import { backendUrl } from '../App';
 import { toast } from 'react-toastify';
 import { Trash2, Loader2, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { cloudinaryImageUrl } from '../utils/imageUrl';
 
 const Gallery = ({ token }) => {
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [imagesLoading, setImagesLoading] = useState(true);
     
     const [files, setFiles] = useState([]);
     const [category, setCategory] = useState('');
@@ -19,6 +21,7 @@ const Gallery = ({ token }) => {
     useEffect(() => () => previewUrls.forEach((url) => URL.revokeObjectURL(url)), [previewUrls]);
     
     const fetchImages = async () => {
+        setImagesLoading(true);
         try {
             const response = await axios.get(backendUrl + '/api/gallery/list');
             if (response.data.success) {
@@ -28,6 +31,8 @@ const Gallery = ({ token }) => {
             }
         } catch (error) {
             toast.error(error.message);
+        } finally {
+            setImagesLoading(false);
         }
     };
     
@@ -200,7 +205,9 @@ const Gallery = ({ token }) => {
                 <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-primary mb-6 pb-2 border-b border-primary/40">Archive Gallery</h2>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {images.length === 0 ? (
+                    {imagesLoading ? (
+                        <div className="py-16 text-center text-primary font-mono text-xs uppercase tracking-widest">Loading gallery…</div>
+                    ) : images.length === 0 ? (
                         <p className="col-span-full p-8 text-center text-primary/60 font-serif italic">
                             No gallery images found.
                         </p>
@@ -213,7 +220,7 @@ const Gallery = ({ token }) => {
                                 className="border border-primary bg-[#FAF9F6] p-2 flex flex-col group"
                             >
                                 <div className="w-full aspect-square overflow-hidden border border-primary relative">
-                                    <img src={item.image} alt={item.title} className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1] group-hover:scale-105 transition-transform duration-500" />
+                                    <img src={cloudinaryImageUrl(item.image, 320)} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1] group-hover:scale-105 transition-transform duration-500" />
                                     <button 
                                         onClick={() => removeImage(item._id)}
                                         className="absolute top-2 right-2 bg-white border border-primary text-red-500 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"

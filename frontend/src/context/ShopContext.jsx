@@ -1,23 +1,28 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { backendUrl } from "../App";
+import { getPosterMinimum, getPosterPrice, getPosterQuantityFromKey, isPosterProduct } from "../utils/posterPricing";
+import { DELIVERY_CHARGE } from "../utils/orderPricing";
 
 export const ShopContext = createContext();
 
 const ShopContextProvider = (props) => {
   const currency = "Rs.";
-  const delivery_fee = 0;
+  const delivery_fee = DELIVERY_CHARGE;
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [cartItems, setCartItems] = useState({});
   const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [galleryImages, setGalleryImages] = useState([]);
   const [token, setToken] = useState("");
   const GALLERY_CART_KEY = "__galleryItems";
+  const POSTER_BATCHES_KEY = "__posterBatches";
 
   const formatPrice = (price) => new Intl.NumberFormat('en-PK').format(price);
 
-  const addToCart = async (itemId, size, customVal = null) => {
+  const addToCart = async (itemId, size, customVal = null, posterQuantity = null) => {
     const product = products.find((p) => p._id === itemId);
     // require option only if product provides options
     if (product && product.sizes && product.sizes.length > 0 && !size) {
@@ -28,6 +33,13 @@ const ShopContextProvider = (props) => {
     let optionKey = size || "Default";
     if (customVal) {
         optionKey = `${optionKey}|${customVal}`;
+    }
+    if (isPosterProduct(product)) {
+      if (!Number.isInteger(Number(posterQuantity)) || Number(posterQuantity) < getPosterMinimum(product)) {
+        toast.error(`Minimum order quantity is ${getPosterMinimum(product)} posters.`);
+        return;
+      }
+      optionKey = `${optionKey}|poster::${Number(posterQuantity)}`;
     }
 
     let cartData = structuredClone(cartItems);
@@ -46,21 +58,167 @@ const ShopContextProvider = (props) => {
 
     if (token) {
       try {
-        await axios.post(
+        const response = await axios.post(
           backendUrl + '/api/cart/add',
-          { itemId, size: optionKey },
+          { itemId, size: optionKey, posterQuantity },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to add item to cart.");
+          await getUserCart(token);
+        }
       } catch (error) {
         toast.error(error.message);
       }
     }
   };
 
-  const addMultipleToCart = async (itemId, size, customVals = []) => {
+  const addPosterBatch = async ({ batchId, productId, size, posterQuantity, designs }) => {
+    const product = products.find((entry) => entry._id === productId);
+    const minimum = getPosterMinimum(product);
+    if (!isPosterProduct(product) || product.comingSoon) {
+      toast.error("The selected poster product is not currently available.");
+      return false;
+    }
+    if (!Number.isInteger(Number(posterQuantity)) || Number(posterQuantity) < minimum) {
+      toast.error(`Minimum order quantity is ${minimum} posters.`);
+      return false;
+    }
+    if (!Array.isArray(designs) || designs.length !== Number(posterQuantity)) {
+      toast.error(`You selected ${posterQuantity} posters. Please provide exactly ${posterQuantity} designs.`);
+      return false;
+    }
+
+    const posterBatch = {
+      batchId: batchId || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      productId,
+      size: size || "Default",
+      posterQuantity: Number(posterQuantity),
+      designCount: designs.length,
+      designs,
+    };
+
+    if (token) {
+      try {
+        const response = await axios.post(
+          backendUrl + "/api/cart/add",
+          { posterBatch },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to add poster batch to cart.");
+          return false;
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+        return false;
+      }
+    }
+
+    setCartItems((currentCartItems) => ({
+      ...currentCartItems,
+      [POSTER_BATCHES_KEY]: [...(currentCartItems[POSTER_BATCHES_KEY] || []), posterBatch],
+    }));
+    return true;
+  };
+
+  const addPosterBatches = async (batches) => {
+    if (!Array.isArray(batches) || batches.length === 0) return false;
+    const posterBatches = [];
+    try {
+      for (const batch of batches) {
+        const product = products.find((entry) => entry._id === batch.productId);
+        const minimum = getPosterMinimum(product);
+        if (!isPosterProduct(product) || product.comingSoon) {
+          throw new Error("The selected poster product is not currently available.");
+        }
+        if (!Number.isInteger(Number(batch.posterQuantity)) || Number(batch.posterQuantity) < minimum) {
+          throw new Error(`Minimum order quantity for ${product.name} is ${minimum} posters.`);
+        }
+        if (!Array.isArray(batch.designs) || batch.designs.length !== Number(batch.posterQuantity)) {
+          throw new Error(`You selected ${batch.posterQuantity} posters. Please provide exactly ${batch.posterQuantity} designs.`);
+        }
+        posterBatches.push({
+          batchId: batch.batchId || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+          productId: batch.productId,
+          size: batch.size || "Default",
+          posterQuantity: Number(batch.posterQuantity),
+          designCount: batch.designs.length,
+          designs: batch.designs,
+        });
+      }
+    } catch (error) {
+      toast.error(error.message);
+      return false;
+    }
+
+    const galleryDesignIds = posterBatches.flatMap((batch) => batch.designs)
+      .filter((design) => design.type === "gallery")
+      .map((design) => design.galleryDesignId);
+    if (new Set(galleryDesignIds).size !== galleryDesignIds.length) {
+      toast.error("Each selected Gallery design can only be assigned to one poster group.");
+      return false;
+    }
+
+    if (token) {
+      try {
+        const response = await axios.post(
+          backendUrl + "/api/cart/add",
+          { posterBatches },
+          { headers: { Authorization: "Bearer " + token } }
+        );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to add poster batches to cart.");
+          return false;
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+        return false;
+      }
+    }
+
+    setCartItems((currentCartItems) => ({
+      ...currentCartItems,
+      [POSTER_BATCHES_KEY]: [...(currentCartItems[POSTER_BATCHES_KEY] || []), ...posterBatches],
+    }));
+    return true;
+  };
+
+  const removePosterBatch = async (batchId) => {
+    const currentBatches = cartItems[POSTER_BATCHES_KEY] || [];
+    const remainingBatches = currentBatches.filter((batch) => batch.batchId !== batchId);
+    if (remainingBatches.length === currentBatches.length) return;
+
+    setCartItems((currentCartItems) => ({
+      ...currentCartItems,
+      [POSTER_BATCHES_KEY]: (currentCartItems[POSTER_BATCHES_KEY] || []).filter((batch) => batch.batchId !== batchId),
+    }));
+    if (token) {
+      try {
+        const response = await axios.post(
+          backendUrl + "/api/cart/update",
+          { posterBatchId: batchId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to remove poster batch.");
+          await getUserCart(token);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+        await getUserCart(token);
+      }
+    }
+  };
+
+  const addMultipleToCart = async (itemId, size, customVals = [], posterQuantity = null) => {
     const product = products.find((p) => p._id === itemId);
     if (product && product.sizes && product.sizes.length > 0 && !size) {
       toast.error("Select Product Option");
+      return;
+    }
+    if (isPosterProduct(product) && (!Number.isInteger(Number(posterQuantity)) || Number(posterQuantity) < getPosterMinimum(product))) {
+      toast.error(`Minimum order quantity is ${getPosterMinimum(product)} posters.`);
       return;
     }
 
@@ -71,6 +229,7 @@ const ShopContextProvider = (props) => {
         if (customVal) {
             optionKey = `${optionKey}|${customVal}`;
         }
+        if (isPosterProduct(product)) optionKey = `${optionKey}|poster::${Number(posterQuantity)}`;
         
         if (cartData[itemId]) {
             if (cartData[itemId][optionKey]) {
@@ -90,15 +249,20 @@ const ShopContextProvider = (props) => {
           // Sending multiple items to the backend would require an endpoint change
           // For now, we can loop requests or just call the add endpoint multiple times
           // Using Promise.all to add them concurrently
-          await Promise.all(customVals.map(customVal => {
+          const responses = await Promise.all(customVals.map(customVal => {
               let optionKey = size || "Default";
               if (customVal) optionKey = `${optionKey}|${customVal}`;
               return axios.post(
                   backendUrl + '/api/cart/add',
-                  { itemId, size: optionKey },
+                  { itemId, size: optionKey, posterQuantity },
                   { headers: { Authorization: `Bearer ${token}` } }
               );
           }));
+          const failedResponse = responses.find((response) => !response.data.success);
+          if (failedResponse) {
+            toast.error(failedResponse.data.message || "Unable to add item to cart.");
+            await getUserCart(token);
+          }
       } catch (error) {
         toast.error(error.message);
       }
@@ -139,6 +303,13 @@ const ShopContextProvider = (props) => {
       toast.error("That product is not currently available.");
       return;
     }
+    if (productId && isPosterProduct(product)) {
+      const minimum = getPosterMinimum(product);
+      if (!Number.isInteger(Number(quantity)) || Number(quantity) < minimum) {
+        toast.error(`Minimum order quantity is ${minimum} posters.`);
+        return;
+      }
+    }
 
     const cartData = structuredClone(cartItems);
     const galleryItems = Array.isArray(cartData[GALLERY_CART_KEY]) ? cartData[GALLERY_CART_KEY] : [];
@@ -153,11 +324,15 @@ const ShopContextProvider = (props) => {
 
     if (token) {
       try {
-        await axios.post(
+        const response = await axios.post(
           backendUrl + "/api/cart/update",
           { galleryDesignId, productId: productId || null, quantity },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to update cart.");
+          await getUserCart(token);
+        }
       } catch (error) {
         toast.error(error.response?.data?.message || error.message);
       }
@@ -165,8 +340,9 @@ const ShopContextProvider = (props) => {
   };
 
   const getCartCount = () => {
-    let totalCount = 0;
+    let totalCount = (cartItems[POSTER_BATCHES_KEY] || []).length;
     for (const items in cartItems) {
+      if (items === POSTER_BATCHES_KEY) continue;
       if (items === GALLERY_CART_KEY) {
         for (const galleryItem of cartItems[items] || []) {
           totalCount += galleryItem.quantity > 0 ? galleryItem.quantity : 0;
@@ -174,11 +350,7 @@ const ShopContextProvider = (props) => {
         continue;
       }
       for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item] > 0) {
-            totalCount += cartItems[items][item];
-          }
-        } catch (error) {}
+        if (cartItems[items][item] > 0) totalCount += cartItems[items][item];
       }
     }
     return totalCount;
@@ -193,36 +365,77 @@ const ShopContextProvider = (props) => {
 
     if (token) {
       try {
-        await axios.post(
+        const response = await axios.post(
           backendUrl + '/api/cart/update',
           { itemId, size, quantity },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to update cart.");
+          await getUserCart(token);
+        }
       } catch (error) {
         toast.error(error.message);
       }
     }
   };
 
+  const updatePosterQuantity = async (itemId, size, posterQuantity) => {
+    const product = products.find((entry) => entry._id === itemId);
+    const price = getPosterPrice(product, posterQuantity);
+    if (price === null) {
+      toast.error(`Minimum order quantity is ${getPosterMinimum(product)} posters.`);
+      return;
+    }
+    const itemCount = cartItems[itemId]?.[size] || 0;
+    const cartData = structuredClone(cartItems);
+    delete cartData[itemId][size];
+    const nextSize = size.replace(/\|poster::\d+/, `|poster::${posterQuantity}`);
+    cartData[itemId][nextSize] = (cartData[itemId][nextSize] || 0) + itemCount;
+    setCartItems(cartData);
+    if (token) {
+      try {
+        const response = await axios.post(backendUrl + "/api/cart/update", {
+          itemId, size, quantity: itemCount, posterQuantity,
+        }, { headers: { Authorization: 'Bearer ' + token } });
+        if (!response.data.success) {
+          toast.error(response.data.message || "Unable to update poster quantity.");
+          await getUserCart(token);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+        await getUserCart(token);
+      }
+    }
+  };
+
   const getCartAmount = () => {
     let totalAmount = 0;
+    for (const batch of cartItems[POSTER_BATCHES_KEY] || []) {
+      const product = products.find((item) => item._id === batch.productId);
+      if (product) totalAmount += getPosterPrice(product, batch.posterQuantity) || 0;
+    }
     for (const items in cartItems) {
+      if (items === POSTER_BATCHES_KEY) continue;
       if (items === GALLERY_CART_KEY) {
         for (const galleryItem of cartItems[items] || []) {
           const product = products.find((item) => item._id === galleryItem.productId);
           if (product && galleryItem.quantity > 0) {
-            totalAmount += product.price * galleryItem.quantity;
+            totalAmount += isPosterProduct(product)
+              ? (getPosterPrice(product, galleryItem.quantity) || 0)
+              : product.price * galleryItem.quantity;
           }
         }
         continue;
       }
       let itemInfo = products.find((product) => product._id === items);
       for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item] > 0) {
-            totalAmount += itemInfo.price * cartItems[items][item];
-          }
-        } catch (error) {}
+        const itemQuantity = cartItems[items][item];
+        if (!itemInfo || itemQuantity <= 0) continue;
+        const posterQuantity = getPosterQuantityFromKey(item);
+        totalAmount += posterQuantity === null
+          ? itemInfo.price * itemQuantity
+          : (getPosterPrice(itemInfo, posterQuantity) || 0) * itemQuantity;
       }
     }
     return totalAmount;
@@ -237,28 +450,45 @@ const ShopContextProvider = (props) => {
       if (repsonse.data.success) {
         setProducts(repsonse.data.products);
       } else {
-        toast.error(repsonse.data.message);
+        toast.error(repsonse.data.message || "Unable to load products. Please try again.");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to load products. Please try again.");
+    } finally {
+      setProductsLoading(false);
     }
   };
 
-  const getUserCart = async (tokenParam) => {
+  const getGalleryData = useCallback(async () => {
+    if (galleryImages.length > 0) return galleryImages;
     try {
+      const response = await axios.get(backendUrl + "/api/gallery/list");
+      if (!response.data.success) throw new Error(response.data.message || "Unable to load gallery.");
+      setGalleryImages(response.data.images);
+      return response.data.images;
+    } catch (error) {
+      throw error;
+    }
+  }, [galleryImages]);
+
+  const getUserCart = useCallback(async (tokenParam) => {
+    try {
+      const authToken = tokenParam || localStorage.getItem("token");
       const repsonse = await axios.post( 
         backendUrl + '/api/cart/get',
         {},
-        { headers: { Authorization: `Bearer ${tokenParam || token}` } }
+        { headers: { Authorization: 'Bearer ' + authToken } }
       );
       if (repsonse.data.success) {
         setCartItems(repsonse.data.cartData);
         localStorage.setItem("cartItems", JSON.stringify(repsonse.data.cartData));
+      } else {
+        toast.error(repsonse.data.message || "Unable to load cart.");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
-  };
+  }, []);
 
   useEffect(() => {
     getProductsData();
@@ -278,7 +508,7 @@ const ShopContextProvider = (props) => {
         }
       }
     }
-  }, []);
+  }, [getUserCart]);
 
   useEffect(() => {
     localStorage.setItem("cartItems", JSON.stringify(cartItems));
@@ -319,6 +549,7 @@ const ShopContextProvider = (props) => {
 
   const value = {
     products,
+    productsLoading,
     currency,
     delivery_fee,
     search,
@@ -328,15 +559,21 @@ const ShopContextProvider = (props) => {
     cartItems,
     addToCart,
     addMultipleToCart,
+    addPosterBatch,
+    addPosterBatches,
+    removePosterBatch,
     addGalleryToCart,
     updateGalleryItem,
     setCartItems,
     getCartCount,
     updateQuantity,
+    updatePosterQuantity,
     getCartAmount,
     token,
     setToken,
     formatPrice,
+    galleryImages,
+    getGalleryData,
   };
 
   return (

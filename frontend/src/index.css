@@ -14,6 +14,15 @@
     background-attachment: fixed;
   }
 
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    line-height: 1.35;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif tracking-tight text-primary;
     text-wrap: balance;
@@ -326,5 +335,38 @@ button:disabled {
     .gallery-print:nth-child(n) {
       transform: none;
     }
+  }
+
+}
+
+.Toastify__toast-container {
+  z-index: 1100 !important;
+  width: min(24rem, calc(100vw - 1rem));
+  padding: 0;
+}
+
+.Toastify__toast {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell.halftone-bg > .Toastify {
+  position: fixed;
+  z-index: 1100;
+}
+
+@media (max-width: 640px) {
+  .Toastify__toast-container--top-right {
+    top: auto;
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    right: 0.5rem;
+    left: auto;
+    width: min(24rem, calc(100vw - 1rem));
+  }
+
+  .Toastify__toast {
+    margin-bottom: 0.5rem;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.875rem;
   }
 }

@@ -3,10 +3,12 @@ import { ShopContext } from '../context/ShopContext';
 import Title from './Title';
 
 const CartTotal = ({ discountPercentage = 0, discountAmount = 0 }) => {
-    const { currency, getCartAmount, formatPrice } = useContext(ShopContext);
+    const { currency, getCartAmount, getCartCount, delivery_fee, formatPrice } = useContext(ShopContext);
     
     const subtotal = getCartAmount();
-    const total = subtotal - discountAmount;
+    const hasItems = getCartCount() > 0;
+    const deliveryCharge = hasItems ? delivery_fee : 0;
+    const total = Math.max(0, subtotal - discountAmount) + deliveryCharge;
     
     return (
         <div className='coupon-paper w-full bg-white border border-border p-6 shadow-vintage'>
@@ -21,17 +23,19 @@ const CartTotal = ({ discountPercentage = 0, discountAmount = 0 }) => {
                     <p className='font-medium text-primary'>{currency} {formatPrice(subtotal)}</p>
                 </div>
                 
-                <div className='flex justify-between items-center text-secondary'>
-                    <p>Shipping Fee</p>
-                    <p className='font-medium text-green-600'>Free</p>
-                </div>
-
                 {discountAmount > 0 && (
                     <div className='flex justify-between items-center text-green-600'>
                         <p>Discount ({discountPercentage}%)</p>
                         <p className='font-medium'>- {currency} {formatPrice(discountAmount)}</p>
                     </div>
                 )}
+
+                <div className='flex justify-between items-center text-secondary'>
+                    <p>Delivery</p>
+                    <p className='font-medium text-primary'>
+                        {hasItems ? `${currency} ${formatPrice(deliveryCharge)}` : '-'}
+                    </p>
+                </div>
                 
                 <hr className='border-border my-2' />
                 

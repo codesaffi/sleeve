@@ -5,14 +5,18 @@ import axios from "axios";
 import { backendUrl } from "../App";
 import { Package, Clock, CreditCard, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { cloudinaryImageUrl } from "../utils/imageUrl";
+import { toast } from "react-toastify";
 
 const Orders = () => {
   const { token, currency, formatPrice } = useContext(ShopContext);
   const [orderData, setOrderData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const loadOrderData = async () => {
     try {
       if (!token) {
+        setLoading(false);
         return;
       }
 
@@ -28,9 +32,13 @@ const Orders = () => {
 
       if (response.data.success) {
         setOrderData([...response.data.orders].reverse());
+      } else {
+        toast.error(response.data.message || "Unable to load orders. Please try again.");
       }
     } catch (error) {
-      console.error("Error loading orders:", error);
+      toast.error(error.response?.data?.message || "Unable to load orders. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,7 +52,9 @@ const Orders = () => {
         <Title text1={"MY"} text2={"ORDERS"} />
       </div>
 
-      {orderData.length === 0 ? (
+      {loading ? (
+        <div className="py-20 text-center text-secondary" role="status">Loading orders…</div>
+      ) : orderData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-secondary bg-background vintage-border shadow-vintage">
           <Package
             size={64}
@@ -64,7 +74,7 @@ const Orders = () => {
         <div className="flex flex-col gap-4">
           {orderData.map((order, index) => {
             const totalQty = order.items.reduce(
-              (acc, item) => acc + item.quantity,
+              (acc, item) => acc + (item.posterQuantity || item.quantity),
               0
             );
 
@@ -87,8 +97,10 @@ const Orders = () => {
                     {firstItem && firstItem.image?.[0] && (
                       <img
                         className="w-full h-full object-cover"
-                        src={firstItem.image[0]}
+                        src={cloudinaryImageUrl(firstItem.image[0], 240)}
                         alt="Order image"
+                        loading="lazy"
+                        decoding="async"
                       />
                     )}
 
@@ -110,7 +122,7 @@ const Orders = () => {
                       </span>
 
                       <span className="flex items-center gap-1 bg-white px-2 py-0.5 border border-border font-medium">
-                        Total Items: x{totalQty}
+                        Total Items: x{totalQty}{firstItem?.posterQuantity ? " PCS" : ""}
                       </span>
 
                       {firstItem && (
@@ -144,6 +156,27 @@ const Orders = () => {
                     </div>
                   </div>
                 </div>
+
+                {order.subtotal !== undefined && (
+                  <div className="w-full border-t border-border pt-3 text-xs text-secondary md:w-auto md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                    <div className="flex justify-between gap-6">
+                      <span>Subtotal</span>
+                      <span>{currency} {formatPrice(order.subtotal)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-6 text-green-700">
+                      <span>Discount</span>
+                      <span>- {currency} {formatPrice(order.discountAmount || 0)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-6">
+                      <span>Delivery</span>
+                      <span>{order.deliveryCharge == null ? "—" : `${currency} ${formatPrice(order.deliveryCharge)}`}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between gap-6 border-t border-border pt-2 font-bold text-primary">
+                      <span>Total</span>
+                      <span>{currency} {formatPrice(order.amount)}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Order Status / Tracking */}
                 <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row justify-between md:justify-center items-center gap-4 sm:w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-none border-border">

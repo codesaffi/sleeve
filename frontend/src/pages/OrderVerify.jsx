@@ -10,7 +10,7 @@ import { Loader2, KeyRound, CheckCircle, RefreshCw, ChevronRight, Mail } from "l
 const OrderVerify = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setCartItems, token } = useContext(ShopContext);
+  const { setCartItems, token, currency, formatPrice } = useContext(ShopContext);
 
   const orderRef = searchParams.get("ref");
   const emailParam = searchParams.get("email");
@@ -20,6 +20,7 @@ const OrderVerify = () => {
   const [resending, setResending] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmedOrderId, setConfirmedOrderId] = useState("");
+  const [confirmedTotals, setConfirmedTotals] = useState(null);
   const [countdown, setCountdown] = useState(60);
   const timerRef = useRef(null);
   const submitLockRef = useRef(false);
@@ -53,6 +54,12 @@ const OrderVerify = () => {
 
       if (res.data.success) {
         setConfirmedOrderId(res.data.orderId);
+        setConfirmedTotals({
+          subtotal: res.data.subtotal,
+          discountAmount: res.data.discountAmount,
+          deliveryCharge: res.data.deliveryCharge,
+          total: res.data.amount,
+        });
         setConfirmed(true);
         if (res.data.emailToken) {
           localStorage.setItem("emailToken", res.data.emailToken);
@@ -120,6 +127,26 @@ const OrderVerify = () => {
                 #{confirmedOrderId.slice(-8).toUpperCase()}
               </span>
             </p>
+          )}
+          {confirmedTotals && (
+            <div className="mb-6 border-y border-border py-4 text-left text-sm">
+              <div className="flex justify-between gap-4 text-secondary">
+                <span>Subtotal</span>
+                <span className="font-medium text-primary">{currency} {formatPrice(confirmedTotals.subtotal)}</span>
+              </div>
+              <div className="mt-2 flex justify-between gap-4 text-green-700">
+                <span>Discount</span>
+                <span>- {currency} {formatPrice(confirmedTotals.discountAmount)}</span>
+              </div>
+              <div className="mt-2 flex justify-between gap-4 text-secondary">
+                <span>Delivery</span>
+                <span className="font-medium text-primary">{currency} {formatPrice(confirmedTotals.deliveryCharge)}</span>
+              </div>
+              <div className="mt-3 flex justify-between gap-4 border-t border-border pt-3 font-bold text-primary">
+                <span>Total</span>
+                <span>{currency} {formatPrice(confirmedTotals.total)}</span>
+              </div>
+            </div>
           )}
           <p className="text-sm text-secondary mb-8 font-sans">
             A confirmation scroll has been dispatched to <span className="font-semibold text-primary">{emailParam}</span>.

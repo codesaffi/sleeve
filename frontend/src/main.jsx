@@ -1,21 +1,8 @@
-import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import Home from './pages/Home.jsx'
-import Contact from './pages/Contact.jsx'
 import ShopContextProvider from './context/ShopContext.jsx'
-import Collection from './pages/Collection.jsx'
-import About from './pages/About.jsx'
-import Product from './pages/Product.jsx'
-import Cart from './pages/Cart.jsx'
-import Login from './pages/Login.jsx'
-import PlaceOrder from './pages/PlaceOrder.jsx'
-import Orders from './pages/Orders.jsx'
-import Profile from './pages/Profile.jsx'
-import OrderVerify from './pages/OrderVerify.jsx'
-import Gallery from './pages/Gallery.jsx'
 
 const router = createBrowserRouter([
   {
@@ -24,52 +11,51 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Home />,
+        lazy: async () => ({ Component: (await import('./pages/Home.jsx')).default }),
       },
       {
         path: "/collection",
-        element: <Collection />,
+        lazy: async () => ({ Component: (await import('./pages/Collection.jsx')).default }),
       },
       {
         path: "/about",
-        element: <About />,
+        lazy: async () => ({ Component: (await import('./pages/About.jsx')).default }),
       },
       {
         path: "/product/:productId",
-        element: <Product />,
+        lazy: async () => ({ Component: (await import('./pages/Product.jsx')).default }),
       },
       {
         path: "/cart",
-        element: <Cart />,
+        lazy: async () => ({ Component: (await import('./pages/Cart.jsx')).default }),
       },
       {
         path: "/login",
-        element: <Login />,
+        lazy: async () => ({ Component: (await import('./pages/Login.jsx')).default }),
       },
       {
         path: "/place-order",
-        element: <PlaceOrder />,
+        lazy: async () => ({ Component: (await import('./pages/PlaceOrder.jsx')).default }),
       },
       {
         path: "/orders",
-        element: <Orders />,
+        lazy: async () => ({ Component: (await import('./pages/Orders.jsx')).default }),
       },
       {
         path: "/contact",
-        element: <Contact />,
+        lazy: async () => ({ Component: (await import('./pages/Contact.jsx')).default }),
       },
-      // New routes
       {
         path: "/profile",
-        element: <Profile />,
+        lazy: async () => ({ Component: (await import('./pages/Profile.jsx')).default }),
       },
       {
         path: "/verify-order",
-        element: <OrderVerify />,
+        lazy: async () => ({ Component: (await import('./pages/OrderVerify.jsx')).default }),
       },
       {
         path: "/gallery",
-        element: <Gallery />,
+        lazy: async () => ({ Component: (await import('./pages/Gallery.jsx')).default }),
       },
     ],
   },
@@ -80,5 +66,3 @@ createRoot(document.getElementById('root')).render(
    <RouterProvider router={router} />
    </ShopContextProvider>
 );
-
-

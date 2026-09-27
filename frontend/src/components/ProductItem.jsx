@@ -1,10 +1,13 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { ShopContext } from '../context/ShopContext';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { cloudinaryImageUrl } from '../utils/imageUrl';
 
-const ProductItem = ({ id, image, name, price, subCategory, category }) => {
+const ProductItem = ({ id, image, name, price, subCategory, category, minimumPosterQuantity, basePosterQuantity, basePosterPrice }) => {
     const { currency, formatPrice } = useContext(ShopContext);
+    const posterPrice = basePosterPrice || price;
+    const posterQuantity = basePosterQuantity || minimumPosterQuantity;
 
     return (
         <motion.div 
@@ -15,8 +18,18 @@ const ProductItem = ({ id, image, name, price, subCategory, category }) => {
                     <div className="w-full h-full overflow-hidden bg-gray-100 border border-primary/30">
                         <img 
                             className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 sepia-[0.1] contrast-105' 
-                            src={image[0]} 
+                            src={cloudinaryImageUrl(image[0], 480)}
                             alt={name} 
+                            loading="lazy"
+                            decoding="async"
+                            onError={(event) => {
+                                if (!event.currentTarget.dataset.fallback) {
+                                    event.currentTarget.dataset.fallback = "true";
+                                    event.currentTarget.src = image[0];
+                                } else {
+                                    event.currentTarget.onerror = null;
+                                }
+                            }}
                         />
                     </div>
                 </div>
@@ -28,7 +41,10 @@ const ProductItem = ({ id, image, name, price, subCategory, category }) => {
                     <h3 className='text-sm font-serif font-bold text-primary leading-snug mb-1 truncate'>{name}</h3>
                     <p className='text-primary/80 mb-2 text-xs truncate'>CATALOGUE ENTRY</p>
                     <div className='mt-auto flex items-center justify-between border-t border-primary/40 pt-2'>
-                        <p className='font-bold text-primary text-xs'>{currency} {formatPrice(price)}</p>
+                        <p className='font-bold text-primary text-xs'>
+                            {currency} {formatPrice(category === "Wall Posters" ? posterPrice : price)}
+                            {category === "Wall Posters" && <span className="ml-1 font-normal normal-case tracking-normal">/ {posterQuantity || 1} PCS</span>}
+                        </p>
                         <span className="archive-stamp">VIEW ✦</span>
                     </div>
                 </div>

@@ -1,10 +1,12 @@
 import mongoose from 'mongoose'
 
 const orderSchema = new mongoose.Schema({
-    userId: { type: String, default: '' },           // empty string for guest orders
+    userId: { type: String, default: '', index: true }, // queried by logged-in users' order history
     guestEmail: { type: String, default: '' },       // used for guest order history lookup
     items: { type: Array, required: true },
+    subtotal: { type: Number },
     amount: { type: Number, required: true },
+    deliveryCharge: { type: Number },
     address: { type: Object, required: true },
     status: { type: String, required: true, default: 'Order Placed' },
     paymentMethod: { type: String, required: true },

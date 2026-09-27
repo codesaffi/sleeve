@@ -26,6 +26,8 @@ const Contact = () => {
               className="w-full h-auto object-cover grayscale opacity-90"
               src={assets.contact_img}
               alt="Contact Sleeve"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </motion.div>

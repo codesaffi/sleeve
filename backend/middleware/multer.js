@@ -13,5 +13,16 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+const productImageUpload = multer({
+    storage,
+    fileFilter: (req, file, callback) => {
+        if (!file.mimetype.startsWith("image/")) {
+            callback(new Error("Product images must be image files."));
+            return;
+        }
+        callback(null, true);
+    }
+});
 
 export default upload;
+export const uploadProductImages = productImageUpload.array("images", 4);

@@ -2,17 +2,21 @@ import axios from 'axios';
 import React, { useEffect, useState, useMemo } from 'react';
 import { backendUrl, currency } from '../App';
 import { toast } from 'react-toastify';
-import { Trash2, TrendingUp, Package, Tag, MessageSquarePlus } from 'lucide-react';
+import { Trash2, TrendingUp, Package, Tag, MessageSquarePlus, Pencil } from 'lucide-react';
 import AdminAddReviewModal from '../components/AdminAddReviewModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { cloudinaryImageUrl } from '../utils/imageUrl';
 
 const List = ({token}) => {
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [editingStock, setEditingStock] = useState({ id: null, value: "" });
 
   const fetchList = async () => { 
+    setLoading(true);
     try {
       const response = await axios.get(backendUrl + '/api/product/list');
       if (response.data.success) {
@@ -21,7 +25,9 @@ const List = ({token}) => {
         toast.error(response.data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Unable to load products. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,6 +61,32 @@ const List = ({token}) => {
       }
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  const openProductEditor = (product) => {
+    setEditingProduct({
+      ...product,
+      minimumPosterQuantity: product.minimumPosterQuantity || 1,
+      basePosterQuantity: product.basePosterQuantity || product.minimumPosterQuantity || 1,
+      basePosterPrice: product.basePosterPrice || product.price,
+      singlePosterPrice: product.singlePosterPrice || product.price,
+    });
+  };
+
+  const saveProduct = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await axios.post(backendUrl + "/api/product/edit", editingProduct, { headers: { token } });
+      if (!response.data.success) {
+        toast.error(response.data.message);
+        return;
+      }
+      toast.success(response.data.message);
+      setEditingProduct(null);
+      await fetchList();
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
@@ -219,7 +251,7 @@ const List = ({token}) => {
                     <td className="px-6 py-4 border-r border-primary/40">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white border border-primary p-1 shrink-0 overflow-hidden shadow-[2px_2px_0px_0px_rgba(26,26,26,1)]">
-                          <img className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1]" src={item.image[0]} alt={item.name} />
+                          <img className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1]" src={cloudinaryImageUrl(item.image[0], 160)} alt={item.name} loading="lazy" decoding="async" />
                         </div>
                         <span className="font-bold font-serif text-primary text-sm line-clamp-2 max-w-[250px] uppercase">{item.name}</span>
                       </div>
@@ -260,6 +292,13 @@ const List = ({token}) => {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => openProductEditor(item)}
+                          className="w-8 h-8 flex items-center justify-center border border-primary text-primary hover:bg-black hover:text-white transition-colors"
+                          title="Edit Product"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
                           onClick={() => setSelectedProduct(item)}
                           className="w-8 h-8 flex items-center justify-center border border-primary text-primary hover:bg-black hover:text-white transition-colors"
                           title="Add Review"
@@ -278,7 +317,9 @@ const List = ({token}) => {
                   </motion.tr>
                 ))}
               </AnimatePresence>
-              {list.length === 0 && (
+              {loading ? (
+                <tr><td colSpan="5" className="px-6 py-12 text-center text-primary font-mono text-xs uppercase tracking-widest">Loading products…</td></tr>
+              ) : list.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-12 text-center text-primary font-mono text-xs uppercase tracking-widest opacity-50">
                     ARCHIVE IS EMPTY
@@ -299,6 +340,53 @@ const List = ({token}) => {
         onClose={() => setSelectedProduct(null)}
         onSuccess={() => setSelectedProduct(null)}
       />
+    )}
+    {editingProduct && (
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => {
+        if (event.target === event.currentTarget) setEditingProduct(null);
+      }}>
+        <form onSubmit={saveProduct} className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-2 border-primary bg-[#FAF9F6] p-5 shadow-vintage sm:p-7">
+          <div className="mb-5 flex items-center justify-between gap-4 border-b border-primary/30 pb-3">
+            <h2 className="text-xl font-serif font-bold text-primary">Edit Product</h2>
+            <button type="button" onClick={() => setEditingProduct(null)} className="border border-primary p-2 text-primary" aria-label="Close edit form">×</button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary sm:col-span-2">Product name
+              <input required value={editingProduct.name} onChange={(event) => setEditingProduct({ ...editingProduct, name: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2 normal-case tracking-normal" />
+            </label>
+            <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary sm:col-span-2">Description
+              <textarea required value={editingProduct.description} onChange={(event) => setEditingProduct({ ...editingProduct, description: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2 normal-case tracking-normal" rows="3" />
+            </label>
+            {editingProduct.category === "Wall Posters" ? (
+              <>
+                <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Minimum quantity
+                  <input required type="number" min="1" step="1" value={editingProduct.minimumPosterQuantity} onChange={(event) => setEditingProduct({ ...editingProduct, minimumPosterQuantity: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+                </label>
+                <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Base quantity
+                  <input required type="number" min="1" step="1" value={editingProduct.basePosterQuantity} onChange={(event) => setEditingProduct({ ...editingProduct, basePosterQuantity: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+                </label>
+                <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Base price (PKR)
+                  <input required type="number" min="0.01" step="0.01" value={editingProduct.basePosterPrice} onChange={(event) => setEditingProduct({ ...editingProduct, basePosterPrice: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+                </label>
+                <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Each additional poster (PKR)
+                  <input required type="number" min="0.01" step="0.01" value={editingProduct.singlePosterPrice} onChange={(event) => setEditingProduct({ ...editingProduct, singlePosterPrice: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+                </label>
+              </>
+            ) : (
+              <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Price (PKR)
+                <input required type="number" min="0.01" step="0.01" value={editingProduct.price} onChange={(event) => setEditingProduct({ ...editingProduct, price: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+              </label>
+            )}
+            <label className="min-w-0 text-xs font-bold uppercase tracking-wide text-primary">Stock
+              <input required type="number" min="0" step="1" value={editingProduct.stock} onChange={(event) => setEditingProduct({ ...editingProduct, stock: event.target.value })} className="mt-1 w-full min-w-0 bg-white px-3 py-2" />
+            </label>
+          </div>
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setEditingProduct(null)} className="min-h-10 border border-primary px-5 py-2 text-sm">Cancel</button>
+            <button type="submit" className="min-h-10 border border-primary bg-primary px-5 py-2 text-sm font-bold text-white">Save Product</button>
+          </div>
+        </form>
+      </div>
     )}
   </>
   );

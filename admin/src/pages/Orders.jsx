@@ -234,7 +234,7 @@ const Orders = ( {token} ) => {
                         <div key={idx} className="flex flex-col gap-1 items-start mb-2">
                           <p className="text-sm font-serif font-bold text-primary leading-snug uppercase">
                             {item.name} 
-                            <span className="text-primary/80 text-[10px] font-mono ml-2">QTY: {item.quantity} {sizeText}</span>
+                            <span className="text-primary/80 text-[10px] font-mono ml-2">{item.posterQuantity ? `POSTER QTY: ${item.posterQuantity} PCS` : `QTY: ${item.quantity}`} {sizeText}</span>
                           </p>
                           {item.designSource && (
                             <div className="text-[10px] font-mono text-primary/80 bg-black/5 px-2 py-1 border border-primary/20">
@@ -248,6 +248,27 @@ const Orders = ( {token} ) => {
                                   [View Image]
                                 </a>
                               )}
+                            </div>
+                          )}
+                          {Array.isArray(item.designs) && item.designs.length > 0 && (
+                            <div className="mt-1">
+                              <p className="mb-1 text-[10px] font-mono font-bold uppercase tracking-widest text-primary/80">
+                                {item.designCount || item.designs.length} attached designs
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {item.designs.map((design, designIndex) => (
+                                  <a
+                                    key={`${design.type}-${design.galleryDesignId || designIndex}`}
+                                    href={design.imageUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={design.title || `Design ${designIndex + 1}`}
+                                    className="h-12 w-12 overflow-hidden border border-primary/30 bg-white"
+                                  >
+                                    <img src={design.imageUrl} alt={`Order design ${designIndex + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                                  </a>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -298,6 +319,28 @@ const Orders = ( {token} ) => {
                   </div>
                 </div>
               </div>
+              {order.subtotal !== undefined && (
+                <div className="mx-6 mb-6 border-t border-primary/30 pt-4 text-xs font-mono">
+                  <div className="ml-auto max-w-xs space-y-2">
+                    <div className="flex justify-between gap-5">
+                      <span className="text-primary/80">Subtotal</span>
+                      <span>{currency}{new Intl.NumberFormat('en-PK').format(order.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between gap-5 text-green-700">
+                      <span>Discount</span>
+                      <span>- {currency}{new Intl.NumberFormat('en-PK').format(order.discountAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between gap-5">
+                      <span className="text-primary/80">Delivery Charge</span>
+                      <span>{order.deliveryCharge == null ? "—" : `${currency}${new Intl.NumberFormat('en-PK').format(order.deliveryCharge)}`}</span>
+                    </div>
+                    <div className="flex justify-between gap-5 border-t border-primary/30 pt-2 font-bold text-primary">
+                      <span>Total</span>
+                      <span>{currency}{new Intl.NumberFormat('en-PK').format(order.amount)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>

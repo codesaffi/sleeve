@@ -2,19 +2,33 @@ import { v2 as cloudinary } from "cloudinary"
 import productModel from "../models/productModels.js"
 import path from 'path'
 import PDFDocument from "pdfkit-table"
+import { validatePosterPricing } from "../utils/posterPricing.js"
 
 // funtion for add products
 const addProduct = async (req,res) => {
     try {
         
-        const { name, description, price, category, subCategory, sizes, bestseller, specifications, stock } = req.body
+        const { name, description, price, category, subCategory, sizes, bestseller, specifications, stock, comingSoon } = req.body
+        const isPoster = category === "Wall Posters"
+        if (isPoster) {
+            const pricingError = validatePosterPricing({
+                minimumQuantity: req.body.minimumPosterQuantity,
+                baseQuantity: req.body.basePosterQuantity,
+                basePrice: req.body.basePosterPrice,
+                singlePosterPrice: req.body.singlePosterPrice,
+            })
+            if (pricingError) return res.status(400).json({ success: false, message: pricingError })
+        } else if (!comingSoon && (!Number.isFinite(Number(price)) || Number(price) <= 0)) {
+            return res.status(400).json({ success: false, message: "Price must be a positive number." })
+        }
 
-        const image1 = req.files.image1 && req.files.image1[0]
-        const image2 = req.files.image2 && req.files.image2[0]
-        const image3 = req.files.image3 && req.files.image3[0]
-        const image4 = req.files.image4 && req.files.image4[0]
-
-        const images = [image1,image2,image3,image4].filter((item)=> item !== undefined)
+        const images = req.files || []
+        if (images.length > 4) {
+            return res.status(400).json({ success: false, message: "A maximum of 4 product images is allowed." })
+        }
+        if (images.some((image) => !image.mimetype?.startsWith("image/"))) {
+            return res.status(400).json({ success: false, message: "Product images must be image files." })
+        }
 
         // let imagesUrl = await Promise.all(
         //    images.map(async (item) => {
@@ -58,13 +72,21 @@ const addProduct = async (req,res) => {
             description,
             category,
             price: Number(price),
+            ...(isPoster ? {
+                minimumPosterQuantity: Number(req.body.minimumPosterQuantity),
+                basePosterQuantity: Number(req.body.basePosterQuantity),
+                basePosterPrice: Number(req.body.basePosterPrice),
+                singlePosterPrice: Number(req.body.singlePosterPrice),
+                price: Number(req.body.basePosterPrice),
+            } : {}),
             subCategory,
             bestseller: bestseller === "true" ? true : false,
             sizes: JSON.parse(sizes),
             stock: Number(stock) || 0,
             image: imagesUrl,
             date: Date.now(),
-            specifications: parsedSpecifications
+            specifications: parsedSpecifications,
+            comingSoon: comingSoon === "true"
         }
 
         const product = new productModel(productData);
@@ -82,7 +104,7 @@ const addProduct = async (req,res) => {
 const listProducts = async (req,res) => {
     try {
         
-        const products = await productModel.find({});
+        const products = await productModel.find({}).select("-__v").lean();
         res.json({success:true,products})
 
     } catch (error) {
@@ -107,7 +129,7 @@ const singleProduct = async (req,res) => {
     try {
 
         const { productId } = req.body
-        const product = await productModel.findById(productId)
+        const product = await productModel.findById(productId).select("-__v").lean()
         res.json({success:true,product})
         
     } catch (error) {
@@ -125,6 +147,38 @@ const editProductStock = async (req, res) => {
         res.json({ success: true, message: "Stock Updated" });
     } catch (error) {
         res.json({ success: false, message: error.message });
+    }
+}
+
+const editProduct = async (req, res) => {
+    try {
+        const { id, name, description, price, category, subCategory, stock, minimumPosterQuantity, basePosterQuantity, basePosterPrice, singlePosterPrice } = req.body
+        const product = await productModel.findById(id)
+        if (!product) return res.status(404).json({ success: false, message: "Product not found." })
+        const update = { name, description, category, subCategory, stock: Number(stock) }
+        if (category === "Wall Posters") {
+            const pricingError = validatePosterPricing({ minimumQuantity: minimumPosterQuantity, baseQuantity: basePosterQuantity, basePrice: basePosterPrice, singlePosterPrice })
+            if (pricingError) return res.status(400).json({ success: false, message: pricingError })
+            Object.assign(update, {
+                minimumPosterQuantity: Number(minimumPosterQuantity),
+                basePosterQuantity: Number(basePosterQuantity),
+                basePosterPrice: Number(basePosterPrice),
+                singlePosterPrice: Number(singlePosterPrice),
+                price: Number(basePosterPrice),
+            })
+        } else {
+            if (!Number.isFinite(Number(price)) || Number(price) <= 0) {
+                return res.status(400).json({ success: false, message: "Price must be a positive number." })
+            }
+            update.price = Number(price)
+        }
+        if (!Number.isFinite(update.stock) || update.stock < 0) {
+            return res.status(400).json({ success: false, message: "Stock cannot be negative." })
+        }
+        await productModel.findByIdAndUpdate(id, update, { runValidators: true })
+        return res.json({ success: true, message: "Product updated." })
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message })
     }
 }
 
@@ -188,4 +242,4 @@ const generateInventoryPDF = async (req, res) => {
     }
 }
 
-export {addProduct,listProducts,removeProduct,singleProduct,editProductStock,generateInventoryPDF}
+export {addProduct,listProducts,removeProduct,singleProduct,editProductStock,editProduct,generateInventoryPDF}

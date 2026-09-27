@@ -24,6 +24,8 @@ const About = () => {
               className="w-full h-auto object-cover grayscale opacity-90"
               src={assets.banner}
               alt="About Sleeve"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </motion.div>

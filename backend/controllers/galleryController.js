@@ -102,9 +102,9 @@ const listGalleryImages = async (req, res) => {
                 }
                 : { category: { $regex: `^\\s*${escapeRegex(category)}\\s*$`, $options: "i" } }
             : {};
-        const records = await galleryModel.find(filter).sort({ createdAt: -1 });
+        const records = await galleryModel.find(filter).select("image title description category createdAt").sort({ createdAt: -1 }).lean();
         const images = records.map((image) => ({
-            ...image.toObject(),
+            ...image,
             category: getCategoryName(image.category),
         }));
         res.json({ success: true, images });

@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { backendUrl } from "../App.jsx";
 import { CreditCard, Truck, ShieldCheck, Wallet, Loader2, Info } from "lucide-react";
+import { getPosterQuantityFromKey, isPosterProduct } from "../utils/posterPricing";
 
 const InputField = React.memo(({ name, type = "text", placeholder, required = true, value, onChange }) => (
   <input
@@ -16,7 +17,7 @@ const InputField = React.memo(({ name, type = "text", placeholder, required = tr
     value={value}
     type={type}
     placeholder={placeholder}
-    className="w-full bg-white border border-border px-4 py-3.5 outline-none focus:border-primary focus:ring-0 transition-all text-sm text-primary placeholder:text-gray-400 font-sans"
+    className="w-full min-w-0 flex-1 bg-white border border-border px-4 py-3.5 outline-none focus:border-primary focus:ring-0 transition-all text-sm text-primary placeholder:text-gray-400 font-sans"
   />
 ));
 
@@ -37,6 +38,7 @@ const PlaceOrder = () => {
     cartItems,
     setCartItems,
     getCartAmount,
+    getCartCount,
     delivery_fee,
     products,
   } = useContext(ShopContext);
@@ -100,43 +102,97 @@ const PlaceOrder = () => {
 
   const buildOrderItems = () => {
     const orderItems = [];
+    const posterDesignGroups = new Map();
+    const addLegacyPosterDesign = (product, size, posterQuantity, design, copies = 1) => {
+      const groupKey = `${product._id}|${size || "Default"}|${posterQuantity ?? "auto"}`;
+      const group = posterDesignGroups.get(groupKey) || {
+        product,
+        size: size || "Default",
+        requestedQuantity: posterQuantity,
+        designs: [],
+      };
+      for (let copy = 0; copy < copies; copy += 1) {
+        if (design) group.designs.push(design);
+      }
+      posterDesignGroups.set(groupKey, group);
+    };
+
+    for (const batch of cartItems.__posterBatches || []) {
+      orderItems.push({
+        productId: batch.productId,
+        posterBatch: true,
+        posterBatchId: batch.batchId,
+        posterQuantity: batch.posterQuantity,
+        designCount: batch.designCount,
+        designs: batch.designs,
+        quantity: 1,
+        size: batch.size || "Default",
+      });
+    }
+
     for (const galleryItem of cartItems.__galleryItems || []) {
       const product = products.find((entry) => entry._id === galleryItem.productId);
       if (product && galleryItem.productId) {
+        if (isPosterProduct(product)) {
+          addLegacyPosterDesign(product, "Default", null, {
+            type: "gallery",
+            galleryDesignId: galleryItem.galleryDesignId,
+          });
+          continue;
+        }
         orderItems.push({
           ...structuredClone(product),
           productId: product._id,
           galleryDesignId: galleryItem.galleryDesignId,
           designSource: "Gallery",
-          quantity: galleryItem.quantity
+          quantity: galleryItem.quantity,
         });
       }
     }
     for (const items in cartItems) {
-      if (items === "__galleryItems") continue;
+      if (items === "__galleryItems" || items === "__posterBatches") continue;
       for (const item in cartItems[items]) {
         if (cartItems[items][item] > 0) {
-          const itemInfo = structuredClone(products.find((product) => product._id === items));
+          const product = products.find((entry) => entry._id === items);
+          const itemInfo = product ? structuredClone(product) : null;
           if (itemInfo) {
-            const parts = item.split('|');
+            const posterQuantity = getPosterQuantityFromKey(item);
+            const keyWithoutPosterQuantity = item.replace(/\|poster::\d+/, "");
+            const parts = keyWithoutPosterQuantity.split('|');
             itemInfo.size = parts[0];
+            const encodedDesign = parts.slice(1).join('|');
+            let design = null;
             if (parts.length > 1) {
-                const customParts = parts[1].split('::');
+                const customParts = encodedDesign.split('::');
                 const customType = customParts[0];
                 if (customType === 'gallery') {
-                    itemInfo.designSource = 'Gallery';
-                    itemInfo.galleryImageId = customParts[1];
-                    itemInfo.customImageUrl = customParts.slice(2).join('::');
+                    design = { type: "gallery", galleryDesignId: customParts[1] };
                 } else if (customType === 'custom') {
-                    itemInfo.designSource = 'Customer Upload';
-                    itemInfo.customImageUrl = customParts.slice(1).join('::');
+                    design = { type: "upload", imageUrl: customParts.slice(1).join('::') };
                 }
+            }
+            if (isPosterProduct(itemInfo)) {
+              addLegacyPosterDesign(itemInfo, itemInfo.size, posterQuantity, design, cartItems[items][item]);
+              continue;
             }
             itemInfo.quantity = cartItems[items][item];
             orderItems.push(itemInfo);
           }
         }
       }
+    }
+
+    for (const group of posterDesignGroups.values()) {
+      const posterQuantity = group.requestedQuantity ?? group.designs.length;
+      orderItems.push({
+        productId: group.product._id,
+        posterBatch: true,
+        posterQuantity,
+        designCount: group.designs.length,
+        designs: group.designs,
+        quantity: 1,
+        size: group.size,
+      });
     }
     return orderItems;
   };
@@ -163,7 +219,7 @@ const PlaceOrder = () => {
       const orderData = {
         address: formData,
         items: orderItems,
-        amount: getCartAmount() + delivery_fee, // The backend will recalculate discount on this base amount
+        amount: Math.max(0, getCartAmount() - discountAmount) + (getCartCount() > 0 ? delivery_fee : 0),
         discountCode: appliedDiscountCode,
         paymentMethod: method === "cod" ? "COD" : "Online",
         marketingConsent,

@@ -1,20 +1,84 @@
-import React, { useState } from 'react';
-import { assets } from '../assets/admin_assets/assets';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { backendUrl } from '../App';
 import { toast } from 'react-toastify';
-import { Upload, Plus, Trash2, X } from 'lucide-react';
+import { Upload, Plus, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const ProductImagePicker = ({ images, setImages }) => {
+  const [previewUrls, setPreviewUrls] = useState([]);
+
+  useEffect(() => {
+    const urls = images.map((image) => URL.createObjectURL(image));
+    setPreviewUrls(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [images]);
+
+  return (
+    <section className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/40 pb-3">
+        <div>
+          <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-[0.2em]">Product Images</p>
+          <p className="mt-1 text-xs text-primary/70">Select up to 4 images. You can add more in another selection.</p>
+        </div>
+        <label className={`inline-flex min-h-10 cursor-pointer items-center gap-2 border border-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-primary transition-colors ${images.length === 4 ? "cursor-not-allowed opacity-50" : "hover:bg-primary hover:text-white"}`}>
+          <Upload size={16} />
+          Choose Images
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={images.length === 4}
+            onChange={(event) => {
+              const selectedFiles = Array.from(event.target.files || []);
+              event.target.value = "";
+              if (selectedFiles.length === 0) return;
+              if (images.length + selectedFiles.length > 4) {
+                toast.error("You can upload a maximum of 4 product images.");
+                return;
+              }
+              if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
+                toast.error("Please select image files only.");
+                return;
+              }
+              setImages((currentImages) => [...currentImages, ...selectedFiles]);
+            }}
+            className="sr-only"
+          />
+        </label>
+      </div>
+      <p className="mt-3 text-xs font-mono text-primary" aria-live="polite">Selected: {images.length} / 4</p>
+      {images.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {images.map((image, index) => (
+            <div key={`${image.name}-${image.lastModified}-${index}`} className="relative aspect-square min-w-0 overflow-hidden border-2 border-primary shadow-[3px_3px_0px_0px_rgba(26,26,26,1)]">
+              <img className="h-full w-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1]" src={previewUrls[index]} alt={`Product image ${index + 1} preview`} />
+              <button
+                type="button"
+                onClick={() => setImages((currentImages) => currentImages.filter((_, imageIndex) => imageIndex !== index))}
+                className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-primary bg-[#FAF9F6] text-primary hover:bg-primary hover:text-white"
+                aria-label={`Remove product image ${index + 1}`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
 const Add = ({token}) => {
-  const [image1, setImage1] = useState(false);
-  const [image2, setImage2] = useState(false);
-  const [image3, setImage3] = useState(false);
-  const [image4, setImage4] = useState(false);
+  const [images, setImages] = useState([]);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [minimumPosterQuantity, setMinimumPosterQuantity] = useState("4");
+  const [basePosterQuantity, setBasePosterQuantity] = useState("4");
+  const [basePosterPrice, setBasePosterPrice] = useState("");
+  const [singlePosterPrice, setSinglePosterPrice] = useState("");
   const [category, setCategory] = useState("Wall Posters");
   const [subCategory, setSubCategory] = useState("Premium");
   const [bestseller, setBestseller] = useState(false);
@@ -43,11 +107,30 @@ const Add = ({token}) => {
   // ── Form submit ───────────────────────────────────────────────
   const onSubmitHandler = async (e) => {
     e.preventDefault();
+    if (category === "Wall Posters") {
+      const minimum = Number(minimumPosterQuantity);
+      if (!Number.isInteger(minimum) || minimum < 1) {
+        toast.error("Minimum poster quantity must be a positive whole number.");
+        return;
+      }
+      if (Number(basePosterQuantity) !== minimum) {
+        toast.error("Base quantity must match the minimum poster quantity.");
+        return;
+      }
+      if ([basePosterPrice, singlePosterPrice].some((value) => !Number.isFinite(Number(value)) || Number(value) <= 0)) {
+        toast.error("Base price and single poster price must be positive numbers.");
+        return;
+      }
+    }
     try {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("description", description);
       formData.append("price", price);
+      formData.append("minimumPosterQuantity", minimumPosterQuantity);
+      formData.append("basePosterQuantity", basePosterQuantity);
+      formData.append("basePosterPrice", basePosterPrice);
+      formData.append("singlePosterPrice", singlePosterPrice);
       formData.append("category", category);
       formData.append("subCategory", subCategory);
       formData.append("bestseller", bestseller);
@@ -61,10 +144,7 @@ const Add = ({token}) => {
       );
       formData.append("specifications", JSON.stringify(filledSpecs));
 
-      image1 && formData.append("image1", image1);
-      image2 && formData.append("image2", image2);
-      image3 && formData.append("image3", image3);
-      image4 && formData.append("image4", image4);
+      images.forEach((image) => formData.append("images", image));
 
       const response = await axios.post(backendUrl + "/api/product/add", formData, {headers: {token}});
 
@@ -72,11 +152,12 @@ const Add = ({token}) => {
         toast.success(response.data.message);
         setName('');
         setDescription('');
-        setImage1(false);
-        setImage2(false);
-        setImage3(false);
-        setImage4(false);
+        setImages([]);
         setPrice('');
+        setMinimumPosterQuantity("4");
+        setBasePosterQuantity("4");
+        setBasePosterPrice("");
+        setSinglePosterPrice("");
         setSizes([]);
         setStock("");
         setSpecifications([{ name: '', value: '' }]);
@@ -87,21 +168,6 @@ const Add = ({token}) => {
       toast.error(error.message);
     }
   };
-
-  const ImageUploader = ({ image, setImage, id }) => (
-    <label htmlFor={id} className="cursor-pointer group">
-      <div className={`w-24 h-24 border-2 flex items-center justify-center overflow-hidden transition-all ${!image ? 'border-dashed border-primary/40 bg-white group-hover:border-primary group-hover:bg-black/5' : 'border-solid border-primary shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]'}`}>
-        {!image ? (
-          <div className="flex flex-col items-center text-primary/40 group-hover:text-primary transition-colors">
-            <Upload size={24} />
-          </div>
-        ) : (
-          <img className="w-full h-full object-cover grayscale-[0.2] contrast-125 sepia-[0.1]" src={URL.createObjectURL(image)} alt="preview" />
-        )}
-      </div>
-      <input onChange={(e) => setImage(e.target.files[0])} type="file" id={id} hidden />
-    </label>
-  );
 
   return (
     <motion.div 
@@ -114,16 +180,29 @@ const Add = ({token}) => {
       <h2 className="text-3xl font-serif font-bold text-primary mb-6 sm:mb-8 tracking-tighter uppercase border-b-2 border-primary pb-2">Catalog Entry <span className="italic">Form</span></h2>
       
       <form onSubmit={onSubmitHandler} className="flex flex-col gap-8">
-        {/* Images */}
         {!comingSoon && (
-          <div className="bg-white border border-primary p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
-            <p className="text-[10px] font-mono font-bold text-primary mb-3 uppercase tracking-[0.2em] border-b border-primary/40 pb-2">Artwork Uploads</p>
-            <div className="flex flex-wrap gap-4">
-              <ImageUploader image={image1} setImage={setImage1} id="image1" />
-              <ImageUploader image={image2} setImage={setImage2} id="image2" />
-              <ImageUploader image={image3} setImage={setImage3} id="image3" />
-              <ImageUploader image={image4} setImage={setImage4} id="image4" />
-            </div>
+          <ProductImagePicker images={images} setImages={setImages} />
+        )}
+
+        {/* Poster pricing */}
+        {!comingSoon && category === "Wall Posters" && (
+          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <label className="min-w-0 text-[10px] font-mono font-bold text-primary uppercase tracking-widest">
+              Minimum Poster Quantity
+              <input value={minimumPosterQuantity} onChange={(e) => setMinimumPosterQuantity(e.target.value)} type="number" min="1" step="1" required className="mt-2 w-full bg-transparent border-b-2 border-primary px-3 py-2 text-sm normal-case tracking-normal" />
+            </label>
+            <label className="min-w-0 text-[10px] font-mono font-bold text-primary uppercase tracking-widest">
+              Base Quantity (must match minimum)
+              <input value={basePosterQuantity} onChange={(e) => setBasePosterQuantity(e.target.value)} type="number" min="1" step="1" required className="mt-2 w-full bg-transparent border-b-2 border-primary px-3 py-2 text-sm normal-case tracking-normal" />
+            </label>
+            <label className="min-w-0 text-[10px] font-mono font-bold text-primary uppercase tracking-widest">
+              Base Price (PKR, for base quantity)
+              <input value={basePosterPrice} onChange={(e) => setBasePosterPrice(e.target.value)} type="number" min="0.01" step="0.01" required placeholder="1000" className="mt-2 w-full bg-transparent border-b-2 border-primary px-3 py-2 text-sm normal-case tracking-normal" />
+            </label>
+            <label className="min-w-0 text-[10px] font-mono font-bold text-primary uppercase tracking-widest">
+              Single Additional Poster Price (PKR)
+              <input value={singlePosterPrice} onChange={(e) => setSinglePosterPrice(e.target.value)} type="number" min="0.01" step="0.01" required placeholder="250" className="mt-2 w-full bg-transparent border-b-2 border-primary px-3 py-2 text-sm normal-case tracking-normal" />
+            </label>
           </div>
         )}
 
@@ -210,17 +289,19 @@ const Add = ({token}) => {
           {!comingSoon && (
             <>
               {/* Price */}
-              <div className="mt-4">
-                <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Pricing (PKR)</p>
-                <input
-                  onChange={(e) => setPrice(e.target.value)}
-                  value={price}
-                  className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
-                  type="number"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
+              {category !== "Wall Posters" && (
+                <div className="mt-4">
+                  <p className="text-[10px] font-mono font-bold text-primary mb-1 uppercase tracking-widest">Pricing (PKR)</p>
+                  <input
+                    onChange={(e) => setPrice(e.target.value)}
+                    value={price}
+                    className="w-full bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 border-primary px-0 py-2 outline-none focus:border-black focus:ring-0 transition-all text-primary font-mono text-lg"
+                    type="number"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+              )}
               
               {/* Stock */}
               <div className="mt-4">

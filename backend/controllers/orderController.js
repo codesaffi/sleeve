@@ -9,35 +9,102 @@ import sendOrderEmail, { sendOtpEmail, sendCustomerConfirmationEmail } from "../
 import PDFDocument from "pdfkit-table";
 import productModel from "../models/productModels.js";
 import galleryModel from "../models/galleryModel.js";
+import { calculatePosterPrice, isPosterProduct, validatePosterDesignBatch, validateUniqueGalleryDesignAssignments } from "../utils/posterPricing.js";
+import { calculateOrderTotals, DELIVERY_CHARGE } from "../utils/orderPricing.js";
 
 const validateOrderItems = async (items) => {
     if (!Array.isArray(items) || items.length === 0) {
         throw new Error("Your cart is empty.");
     }
 
+    const productIds = items.map((item) => item.productId || item._id).filter(Boolean);
+    const productRecords = await productModel.find({ _id: { $in: productIds } });
+    const productsById = new Map(productRecords.map((product) => [product._id.toString(), product]));
+    const galleryIds = [
+        ...items.map((item) => item.galleryDesignId),
+        ...items.flatMap((item) => (Array.isArray(item.designs) ? item.designs : [])
+            .filter((design) => design?.type === "gallery")
+            .map((design) => design.galleryDesignId)),
+    ].filter(Boolean);
+    const galleryRecords = galleryIds.length
+        ? await galleryModel.find({ _id: { $in: galleryIds } }).select("title image")
+        : [];
+    const galleriesById = new Map(galleryRecords.map((gallery) => [gallery._id.toString(), gallery]));
+
     const normalizedItems = [];
     let total = 0;
+    const posterItems = items.filter((item) => {
+        const productId = item.productId || item._id;
+        return isPosterProduct(productsById.get(String(productId)));
+    });
+    const assignmentError = validateUniqueGalleryDesignAssignments(posterItems);
+    if (assignmentError) throw new Error(assignmentError);
     for (const item of items) {
         const quantity = Number(item.quantity);
         const productId = item.productId || item._id;
         if (!Number.isInteger(quantity) || quantity < 1) {
             throw new Error("Invalid item quantity.");
         }
-        const product = await productModel.findById(productId);
+        const product = productsById.get(String(productId));
         if (!product || product.comingSoon) {
             throw new Error("One of the selected products is not currently available.");
         }
 
+        const posterProduct = isPosterProduct(product);
+        const posterQuantity = posterProduct
+            ? (item.posterQuantity === undefined ? quantity : Number(item.posterQuantity))
+            : null;
+        const posterTotalPrice = posterProduct ? calculatePosterPrice(product, posterQuantity) : null;
+        let normalizedDesigns;
+        if (posterProduct) {
+            const designValidationError = validatePosterDesignBatch(product, posterQuantity, item.designs);
+            if (designValidationError) throw new Error(designValidationError);
+            if (quantity !== 1) throw new Error("A poster batch must be submitted as one cart item.");
+
+            normalizedDesigns = item.designs.map((design) => {
+                if (design?.type === "gallery") {
+                    const gallery = galleriesById.get(String(design.galleryDesignId));
+                    if (!gallery) throw new Error("One of the selected gallery designs no longer exists.");
+                    return {
+                        type: "gallery",
+                        galleryDesignId: gallery._id,
+                        title: gallery.title,
+                        imageUrl: gallery.image,
+                    };
+                }
+                if (design?.type !== "upload" || typeof design.imageUrl !== "string") {
+                    throw new Error("Each poster requires a valid uploaded or gallery design.");
+                }
+                let imageUrl;
+                try {
+                    imageUrl = new URL(design.imageUrl);
+                } catch {
+                    throw new Error("Each uploaded design must have a valid image URL.");
+                }
+                if (imageUrl.protocol !== "https:" || !(imageUrl.hostname === "cloudinary.com" || imageUrl.hostname.endsWith(".cloudinary.com"))) {
+                    throw new Error("Uploaded designs must use a secure Cloudinary image URL.");
+                }
+                return { type: "upload", imageUrl: imageUrl.toString() };
+            });
+        }
+        const orderLineQuantity = posterProduct && item.posterQuantity === undefined ? 1 : quantity;
         const normalizedItem = {
             ...product.toObject(),
             productId: product._id,
-            quantity,
+            quantity: orderLineQuantity,
             price: product.price,
+            ...(posterTotalPrice !== null ? { posterQuantity, posterTotalPrice } : {}),
+            ...(posterProduct ? {
+                posterBatch: true,
+                posterBatchId: typeof item.posterBatchId === "string" ? item.posterBatchId : undefined,
+                designCount: normalizedDesigns.length,
+                designs: normalizedDesigns,
+            } : {}),
             size: item.size || "Default"
         };
 
         if (item.galleryDesignId) {
-            const gallery = await galleryModel.findById(item.galleryDesignId);
+            const gallery = galleriesById.get(String(item.galleryDesignId));
             if (!gallery) throw new Error("One of the selected gallery designs no longer exists.");
             normalizedItem.galleryDesignId = gallery._id;
             normalizedItem.galleryTitle = gallery.title;
@@ -50,7 +117,7 @@ const validateOrderItems = async (items) => {
         }
 
         normalizedItems.push(normalizedItem);
-        total += product.price * quantity;
+        total += (posterTotalPrice ?? product.price) * orderLineQuantity;
     }
     return { items: normalizedItems, amount: total };
 };
@@ -64,7 +131,6 @@ const placeOrder = async (req, res) => {
         const validated = await validateOrderItems(items);
         const amount = validated.amount;
 
-        let finalAmount = amount;
         let discountDetails = { code: '', percentage: 0, amount: 0 };
         let discountId = null;
 
@@ -77,8 +143,6 @@ const placeOrder = async (req, res) => {
             }
             
             const discountAmount = Math.round((amount * discount.discountPercentage) / 100);
-            finalAmount = amount - discountAmount;
-            
             discountDetails = {
                 code: discount.code,
                 percentage: discount.discountPercentage,
@@ -86,12 +150,15 @@ const placeOrder = async (req, res) => {
             };
             discountId = discount._id;
         }
+        const orderTotals = calculateOrderTotals(amount, discountDetails.amount);
 
         const orderData = {
             userId,
             items: validated.items,
             address,
-            amount: finalAmount,
+            subtotal: orderTotals.subtotal,
+            deliveryCharge: orderTotals.deliveryCharge,
+            amount: orderTotals.total,
             discountCode: discountDetails.code,
             discountPercentage: discountDetails.percentage,
             discountAmount: discountDetails.amount,
@@ -110,7 +177,15 @@ const placeOrder = async (req, res) => {
         res.json({ success: true, message: "Order Placed Successfully" });
 
         // Side-effects after response
-        const emailData = { ...req.body, amount: finalAmount };
+        const emailData = {
+            ...req.body,
+            orderId: newOrder._id.toString(),
+            items: validated.items,
+            subtotal: orderTotals.subtotal,
+            deliveryCharge: orderTotals.deliveryCharge,
+            discountAmount: discountDetails.amount,
+            amount: orderTotals.total,
+        };
         sendOrderEmail(emailData).catch((err) => console.error('Failed to send admin order email:', err));
         userModel.findByIdAndUpdate(userId, { cartData: {} }).catch((err) => console.error('Failed to clear user cart:', err));
 
@@ -124,7 +199,7 @@ const placeOrder = async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 const allOrders = async (req, res) => {
     try {
-        const orders = await orderModel.find({});
+        const orders = await orderModel.find({}).lean();
         res.json({ success: true, orders });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -137,7 +212,7 @@ const allOrders = async (req, res) => {
 const userOrders = async (req, res) => {
     try {
         const { userId } = req.body;
-        const orders = await orderModel.find({ userId });
+        const orders = await orderModel.find({ userId }).lean();
         res.json({ success: true, orders });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -310,7 +385,10 @@ const verifyOrderOtp = async (req, res) => {
         // OTP is correct — mark as verified immediately to prevent race condition
         await otpModel.findByIdAndUpdate(otpRecord._id, { verified: true });
 
-        const { address, items, amount, paymentMethod, marketingConsent, userId, discountCode } = otpRecord.pendingOrderData;
+        const { address, items: pendingItems, paymentMethod, marketingConsent, userId, discountCode } = otpRecord.pendingOrderData;
+        const validated = await validateOrderItems(pendingItems);
+        const items = validated.items;
+        const amount = validated.amount;
 
         let finalUserId = userId || '';
         
@@ -339,7 +417,6 @@ const verifyOrderOtp = async (req, res) => {
         }
 
         // Process Discount
-        let finalAmount = amount;
         let discountDetails = { code: '', percentage: 0, amount: 0 };
         let discountId = null;
 
@@ -352,8 +429,6 @@ const verifyOrderOtp = async (req, res) => {
             }
             
             const discountAmount = Math.round((amount * discount.discountPercentage) / 100);
-            finalAmount = amount - discountAmount;
-            
             discountDetails = {
                 code: discount.code,
                 percentage: discount.discountPercentage,
@@ -361,6 +436,7 @@ const verifyOrderOtp = async (req, res) => {
             };
             discountId = discount._id;
         }
+        const orderTotals = calculateOrderTotals(amount, discountDetails.amount);
 
         // Create the confirmed order
         const orderData = {
@@ -368,7 +444,9 @@ const verifyOrderOtp = async (req, res) => {
             guestEmail: otpRecord.email,
             items,
             address,
-            amount: finalAmount,
+            subtotal: orderTotals.subtotal,
+            deliveryCharge: orderTotals.deliveryCharge,
+            amount: orderTotals.total,
             discountCode: discountDetails.code,
             discountPercentage: discountDetails.percentage,
             discountAmount: discountDetails.amount,
@@ -395,11 +473,21 @@ const verifyOrderOtp = async (req, res) => {
         }
 
         // Send customer confirmation email (non-blocking)
-        sendCustomerConfirmationEmail({ address, items, amount: finalAmount, paymentMethod }, newOrder._id.toString())
+        const orderEmailData = {
+            address,
+            items,
+            orderId: newOrder._id.toString(),
+            subtotal: orderTotals.subtotal,
+            discountAmount: discountDetails.amount,
+            deliveryCharge: orderTotals.deliveryCharge,
+            amount: orderTotals.total,
+            paymentMethod,
+        };
+        sendCustomerConfirmationEmail(orderEmailData, newOrder._id.toString())
             .catch((err) => console.error('Failed to send customer confirmation email:', err));
 
         // Send admin notification email (non-blocking)
-        sendOrderEmail({ address, items, amount: finalAmount, paymentMethod })
+        sendOrderEmail(orderEmailData)
             .catch((err) => console.error('Failed to send admin order email:', err));
 
         // Issue short-lived email token so they can access their profile without another OTP
@@ -413,6 +501,11 @@ const verifyOrderOtp = async (req, res) => {
             success: true,
             message: 'Order confirmed successfully!',
             orderId: newOrder._id.toString(),
+            subtotal: orderTotals.subtotal,
+            discountAmount: discountDetails.amount,
+            discountPercentage: discountDetails.percentage,
+            deliveryCharge: orderTotals.deliveryCharge,
+            amount: orderTotals.total,
             emailToken
         });
 
@@ -607,9 +700,9 @@ const generateOrderReportPDF = async (req, res) => {
                 ],
                 datas: order.items.map(item => ({
                     name: `${item.name} ${item.size && item.size !== 'Default' ? `(${item.size})` : ''}`,
-                    qty: item.quantity.toString(),
-                    price: `Rs ${item.price}`,
-                    subtotal: `Rs ${item.price * item.quantity}`
+                    qty: item.posterQuantity ? `${item.posterQuantity} PCS` : item.quantity.toString(),
+                    price: `Rs ${item.posterTotalPrice ?? item.price}`,
+                    subtotal: `Rs ${(item.posterTotalPrice ?? item.price) * item.quantity}`
                 }))
             };
             await doc.table(table, {
@@ -618,6 +711,14 @@ const generateOrderReportPDF = async (req, res) => {
             });
 
             doc.moveDown();
+            if (order.subtotal !== undefined) {
+                doc.fontSize(10).font("Helvetica").text(`Subtotal: Rs ${order.subtotal}`, { align: 'right' });
+                if (order.discountAmount > 0) {
+                    doc.text(`Discount: - Rs ${order.discountAmount}`, { align: 'right' });
+                }
+                doc.text(`Delivery: Rs ${order.deliveryCharge ?? DELIVERY_CHARGE}`, { align: 'right' });
+            }
+            doc.moveDown(0.5);
             doc.fontSize(14).font("Helvetica-Bold").text(`Total Amount: Rs ${order.amount}`, { align: 'right' });
 
         } else {

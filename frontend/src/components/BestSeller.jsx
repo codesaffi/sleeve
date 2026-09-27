@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useMemo } from "react";
 import Title from "./Title";
 import { ShopContext } from "../context/ShopContext";
 import ProductItem from "./ProductItem";
@@ -6,12 +6,7 @@ import { motion } from "framer-motion";
 
 const BestSeller = () => {
   const { products } = useContext(ShopContext);
-  const [bestSeller, setBestSeller] = useState([]);
-
-  useEffect(() => {
-    const bestProduct = products.filter((item) => item.bestseller);
-    setBestSeller(bestProduct.slice(0, 5));
-  }, [products]);
+  const bestSeller = useMemo(() => products.filter((item) => item.bestseller).slice(0, 5), [products]);
 
   return (
     <div className="py-16 md:py-24">
@@ -36,6 +31,11 @@ const BestSeller = () => {
             name={item.name}
             image={item.image}
             price={item.price}
+            category={item.category}
+            subCategory={item.subCategory}
+            minimumPosterQuantity={item.minimumPosterQuantity}
+            basePosterQuantity={item.basePosterQuantity}
+            basePosterPrice={item.basePosterPrice}
           />
         ))}
       </motion.div>

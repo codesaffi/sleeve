@@ -10,6 +10,7 @@ import {
   User, Mail, Package, Clock, CreditCard, ShieldCheck,
   LogOut, ChevronRight, Loader2, KeyRound, Eye
 } from "lucide-react";
+import { cloudinaryImageUrl } from "../utils/imageUrl";
 
 // ────────────────────────────────────────────
 // Logged-in user profile section
@@ -147,13 +148,13 @@ const LoggedInProfile = ({ token, currency, formatPrice }) => {
                     {order.items.map((item, i) => (
                       <div key={i} className="flex items-center gap-4">
                         <div className="w-14 h-14 border border-border bg-white p-1 shrink-0">
-                          <img src={item.image?.[0]} alt={item.name} className="w-full h-full object-cover" />
+                          <img src={cloudinaryImageUrl(item.image?.[0], 160)} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-serif font-bold text-primary truncate tracking-wide">{item.name}</p>
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-secondary mt-1 uppercase tracking-wide">
-                            <span className="font-medium text-primary">{currency} {formatPrice(item.price)}</span>
-                            <span>Qty: {item.quantity}</span>
+                            <span className="font-medium text-primary">{currency} {formatPrice(item.posterTotalPrice ?? item.price)}</span>
+                            <span>{item.posterQuantity ? `Poster Quantity: ${item.posterQuantity} PCS` : `Qty: ${item.quantity}`}</span>
                             {item.size && item.size !== "Default" && <span>Frame: {item.size}</span>}
                           </div>
                         </div>
@@ -167,6 +168,23 @@ const LoggedInProfile = ({ token, currency, formatPrice }) => {
                       </div>
                     ))}
                   </div>
+
+                  {order.subtotal !== undefined && (
+                    <div className="mt-4 ml-auto max-w-xs border-t border-border pt-3 text-xs text-secondary">
+                      <div className="flex justify-between gap-5">
+                        <span>Subtotal</span><span>{currency} {formatPrice(order.subtotal)}</span>
+                      </div>
+                      <div className="mt-1 flex justify-between gap-5 text-green-700">
+                        <span>Discount</span><span>- {currency} {formatPrice(order.discountAmount || 0)}</span>
+                      </div>
+                      <div className="mt-1 flex justify-between gap-5">
+                        <span>Delivery</span><span>{order.deliveryCharge == null ? "—" : `${currency} ${formatPrice(order.deliveryCharge)}`}</span>
+                      </div>
+                      <div className="mt-2 flex justify-between gap-5 border-t border-border pt-2 font-bold text-primary">
+                        <span>Total</span><span>{currency} {formatPrice(order.amount)}</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Payment status */}
                   <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs text-secondary uppercase tracking-wide">
@@ -537,13 +555,13 @@ const GuestProfile = ({ currency, formatPrice }) => {
                       {order.items.map((item, i) => (
                         <div key={i} className="flex items-center gap-4">
                           <div className="w-14 h-14 border border-border bg-white p-1 shrink-0">
-                            <img src={item.image?.[0]} alt={item.name} className="w-full h-full object-cover" />
+                            <img src={cloudinaryImageUrl(item.image?.[0], 160)} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-serif font-bold text-primary truncate tracking-wide">{item.name}</p>
                             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-secondary mt-1 uppercase tracking-wide">
-                              <span className="font-medium text-primary">{currency} {formatPrice(item.price)}</span>
-                              <span>Qty: {item.quantity}</span>
+                              <span className="font-medium text-primary">{currency} {formatPrice(item.posterTotalPrice ?? item.price)}</span>
+                              <span>{item.posterQuantity ? `Poster Quantity: ${item.posterQuantity} PCS` : `Qty: ${item.quantity}`}</span>
                               {item.size && item.size !== "Default" && <span>Frame: {item.size}</span>}
                             </div>
                           </div>
@@ -553,6 +571,23 @@ const GuestProfile = ({ currency, formatPrice }) => {
                         </div>
                       ))}
                     </div>
+
+                    {order.subtotal !== undefined && (
+                      <div className="mt-4 ml-auto max-w-xs border-t border-border pt-3 text-xs text-secondary">
+                        <div className="flex justify-between gap-5">
+                          <span>Subtotal</span><span>{currency} {formatPrice(order.subtotal)}</span>
+                        </div>
+                        <div className="mt-1 flex justify-between gap-5 text-green-700">
+                          <span>Discount</span><span>- {currency} {formatPrice(order.discountAmount || 0)}</span>
+                        </div>
+                        <div className="mt-1 flex justify-between gap-5">
+                          <span>Delivery</span><span>{order.deliveryCharge == null ? "—" : `${currency} ${formatPrice(order.deliveryCharge)}`}</span>
+                        </div>
+                        <div className="mt-2 flex justify-between gap-5 border-t border-border pt-2 font-bold text-primary">
+                          <span>Total</span><span>{currency} {formatPrice(order.amount)}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs text-secondary uppercase tracking-wide">
                       <span>Payment: <span className={`font-semibold ${order.payment ? "text-primary" : "text-secondary"}`}>
