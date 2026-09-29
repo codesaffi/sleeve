@@ -1,4 +1,4 @@
-import React, { useContext, useState, useRef } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { backendUrl } from "../App.jsx";
 import { CreditCard, Truck, ShieldCheck, Wallet, Loader2, Info } from "lucide-react";
 import { getPosterQuantityFromKey, isPosterProduct } from "../utils/posterPricing";
+import { getCartProductIds, trackInitiateCheckout, trackPurchase } from "../utils/metaPixel";
 
 const InputField = React.memo(({ name, type = "text", placeholder, required = true, value, onChange }) => (
   <input
@@ -41,6 +42,7 @@ const PlaceOrder = () => {
     getCartCount,
     delivery_fee,
     products,
+    productsLoading,
   } = useContext(ShopContext);
 
   const [formData, setFormData] = useState({
@@ -58,6 +60,20 @@ const PlaceOrder = () => {
   const [marketingConsent, setMarketingConsent] = useState(false);
 
   const navigate = useNavigate();
+  const checkoutTrackedRef = useRef(false);
+  const cartItemCount = getCartCount();
+  const cartAmount = getCartAmount();
+
+  useEffect(() => {
+    if (checkoutTrackedRef.current || productsLoading || cartItemCount <= 0) return;
+
+    trackInitiateCheckout({
+      contentIds: getCartProductIds(cartItems),
+      numItems: cartItemCount,
+      value: cartAmount + delivery_fee,
+    });
+    checkoutTrackedRef.current = true;
+  }, [cartAmount, cartItemCount, cartItems, delivery_fee, productsLoading]);
 
   const onChangeHandler = (event) => {
     const name = event.target.name;
@@ -204,6 +220,8 @@ const PlaceOrder = () => {
     setLoading(true);
 
     try {
+      const purchaseAttemptId = globalThis.crypto?.randomUUID?.()
+        ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const orderItems = buildOrderItems();
 
       if (orderItems.length === 0) {
@@ -240,6 +258,15 @@ const PlaceOrder = () => {
               { headers: { Authorization: `Bearer ${token}` } }
             );
             if (response.data.success) {
+              trackPurchase({
+                orderId: response.data.orderId || response.data.order?._id,
+                fallbackId: purchaseAttemptId,
+                contentIds: [...new Set(orderItems.map((item) => item.productId || item._id).filter(Boolean))],
+                numItems: getCartCount(),
+                value: Number.isFinite(Number(response.data.amount))
+                  ? Number(response.data.amount)
+                  : orderData.amount,
+              });
               toast.success(response.data.message);
               setCartItems({});
               navigate("/orders");

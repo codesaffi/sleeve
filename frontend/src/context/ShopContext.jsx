@@ -4,6 +4,7 @@ import axios from "axios";
 import { backendUrl } from "../App";
 import { getPosterMinimum, getPosterPrice, getPosterQuantityFromKey, isPosterProduct } from "../utils/posterPricing";
 import { DELIVERY_CHARGE } from "../utils/orderPricing";
+import { trackAddToCart } from "../utils/metaPixel";
 
 export const ShopContext = createContext();
 
@@ -27,7 +28,7 @@ const ShopContextProvider = (props) => {
     // require option only if product provides options
     if (product && product.sizes && product.sizes.length > 0 && !size) {
       toast.error("Select Product Option");
-      return;
+      return false;
     }
 
     let optionKey = size || "Default";
@@ -37,7 +38,7 @@ const ShopContextProvider = (props) => {
     if (isPosterProduct(product)) {
       if (!Number.isInteger(Number(posterQuantity)) || Number(posterQuantity) < getPosterMinimum(product)) {
         toast.error(`Minimum order quantity is ${getPosterMinimum(product)} posters.`);
-        return;
+        return false;
       }
       optionKey = `${optionKey}|poster::${Number(posterQuantity)}`;
     }
@@ -66,11 +67,26 @@ const ShopContextProvider = (props) => {
         if (!response.data.success) {
           toast.error(response.data.message || "Unable to add item to cart.");
           await getUserCart(token);
+          return false;
         }
       } catch (error) {
         toast.error(error.message);
+        return false;
       }
     }
+    if (product) {
+      const value = isPosterProduct(product)
+        ? getPosterPrice(product, posterQuantity) ?? product.price
+        : product.price;
+      trackAddToCart([{
+        id: product._id,
+        name: product.name,
+        category: product.category,
+        value,
+        quantity: isPosterProduct(product) ? Number(posterQuantity) : 1,
+      }]);
+    }
+    return true;
   };
 
   const addPosterBatch = async ({ batchId, productId, size, posterQuantity, designs }) => {
@@ -119,6 +135,13 @@ const ShopContextProvider = (props) => {
       ...currentCartItems,
       [POSTER_BATCHES_KEY]: [...(currentCartItems[POSTER_BATCHES_KEY] || []), posterBatch],
     }));
+    trackAddToCart([{
+      id: product._id,
+      name: product.name,
+      category: product.category,
+      value: getPosterPrice(product, posterBatch.posterQuantity) ?? product.price,
+      quantity: posterBatch.posterQuantity,
+    }]);
     return true;
   };
 
@@ -181,6 +204,16 @@ const ShopContextProvider = (props) => {
       ...currentCartItems,
       [POSTER_BATCHES_KEY]: [...(currentCartItems[POSTER_BATCHES_KEY] || []), ...posterBatches],
     }));
+    trackAddToCart(posterBatches.map((batch) => {
+      const product = products.find((entry) => entry._id === batch.productId);
+      return {
+        id: product?._id,
+        name: product?.name,
+        category: product?.category,
+        value: getPosterPrice(product, batch.posterQuantity) ?? product?.price ?? 0,
+        quantity: batch.posterQuantity,
+      };
+    }));
     return true;
   };
 
@@ -215,12 +248,13 @@ const ShopContextProvider = (props) => {
     const product = products.find((p) => p._id === itemId);
     if (product && product.sizes && product.sizes.length > 0 && !size) {
       toast.error("Select Product Option");
-      return;
+      return false;
     }
     if (isPosterProduct(product) && (!Number.isInteger(Number(posterQuantity)) || Number(posterQuantity) < getPosterMinimum(product))) {
       toast.error(`Minimum order quantity is ${getPosterMinimum(product)} posters.`);
-      return;
+      return false;
     }
+    if (!customVals.length) return false;
 
     let cartData = structuredClone(cartItems);
 
@@ -262,11 +296,26 @@ const ShopContextProvider = (props) => {
           if (failedResponse) {
             toast.error(failedResponse.data.message || "Unable to add item to cart.");
             await getUserCart(token);
+            return false;
           }
       } catch (error) {
         toast.error(error.message);
+        return false;
       }
     }
+    if (product) {
+      const value = isPosterProduct(product)
+        ? (getPosterPrice(product, posterQuantity) ?? product.price) * customVals.length
+        : product.price * customVals.length;
+      trackAddToCart([{
+        id: product._id,
+        name: product.name,
+        category: product.category,
+        value,
+        quantity: isPosterProduct(product) ? Number(posterQuantity) * customVals.length : customVals.length,
+      }]);
+    }
+    return true;
   };
 
   const addGalleryToCart = async (galleryDesignId) => {
@@ -316,12 +365,14 @@ const ShopContextProvider = (props) => {
     const item = galleryItems.find((entry) => entry.galleryDesignId === galleryDesignId);
     if (!item) return;
 
+    const addingProduct = !item.productId && !!productId;
     item.productId = productId || null;
     item.quantity = quantity;
     cartData[GALLERY_CART_KEY] = galleryItems.filter((entry) => entry.quantity > 0);
     setCartItems(cartData);
     localStorage.setItem("cartItems", JSON.stringify(cartData));
 
+    let updateSucceeded = true;
     if (token) {
       try {
         const response = await axios.post(
@@ -332,10 +383,25 @@ const ShopContextProvider = (props) => {
         if (!response.data.success) {
           toast.error(response.data.message || "Unable to update cart.");
           await getUserCart(token);
+          updateSucceeded = false;
         }
       } catch (error) {
         toast.error(error.response?.data?.message || error.message);
+        updateSucceeded = false;
       }
+    }
+
+    if (addingProduct && product && updateSucceeded) {
+      const value = isPosterProduct(product)
+        ? getPosterPrice(product, quantity) ?? product.price
+        : product.price * quantity;
+      trackAddToCart([{
+        id: product._id,
+        name: product.name,
+        category: product.category,
+        value,
+        quantity,
+      }]);
     }
   };
 

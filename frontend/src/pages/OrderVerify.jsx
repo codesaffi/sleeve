@@ -6,11 +6,12 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
 import { Loader2, KeyRound, CheckCircle, RefreshCw, ChevronRight, Mail } from "lucide-react";
+import { getCartProductIds, trackPurchase } from "../utils/metaPixel";
 
 const OrderVerify = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setCartItems, token, currency, formatPrice } = useContext(ShopContext);
+  const { setCartItems, token, currency, formatPrice, cartItems, getCartCount } = useContext(ShopContext);
 
   const orderRef = searchParams.get("ref");
   const emailParam = searchParams.get("email");
@@ -53,6 +54,12 @@ const OrderVerify = () => {
       const res = await axios.post(backendUrl + "/api/order/verify-otp", { orderRef, otp: otp.trim() });
 
       if (res.data.success) {
+        trackPurchase({
+          orderId: res.data.orderId,
+          contentIds: getCartProductIds(cartItems),
+          numItems: getCartCount(),
+          value: res.data.amount,
+        });
         setConfirmedOrderId(res.data.orderId);
         setConfirmedTotals({
           subtotal: res.data.subtotal,

@@ -3,6 +3,7 @@ import { ShopContext } from '../context/ShopContext';
 import { useLocation } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { trackSearch } from '../utils/metaPixel';
 
 const SearchBar = () => {
     const { search, setSearch, showSearch, setShowSearch } = useContext(ShopContext);
@@ -16,6 +17,14 @@ const SearchBar = () => {
             setVisible(false);
         }
     }, [location]);
+
+    useEffect(() => {
+        const searchTerm = search.trim();
+        if (!showSearch || location.pathname !== '/collection' || !searchTerm) return undefined;
+
+        const timeout = setTimeout(() => trackSearch(searchTerm), 500);
+        return () => clearTimeout(timeout);
+    }, [search, showSearch, location.pathname]);
 
     return (
         <AnimatePresence>

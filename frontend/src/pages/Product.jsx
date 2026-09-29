@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ShopContext } from "../context/ShopContext";
 import { backendUrl } from "../App";
@@ -11,12 +11,14 @@ import { Star, ShieldCheck, Truck, RefreshCcw, ShoppingCart, X } from "lucide-re
 import { toast } from "react-toastify";
 import { cloudinaryImageUrl } from "../utils/imageUrl";
 import { getPosterMinimum, getPosterPrice, isPosterProduct } from "../utils/posterPricing";
+import { trackViewContent } from "../utils/metaPixel";
 
 const Product = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { products, productsLoading, currency, addToCart, addMultipleToCart, addPosterBatch, formatPrice, galleryImages, getGalleryData } = useContext(ShopContext);
   const [productData, setProductData] = useState(false);
+  const trackedProductIdRef = useRef(null);
   const [image, setImage] = useState("");
   const [size, setSize] = useState("");
   const [selectedPosterQuantity, setSelectedPosterQuantity] = useState(1);
@@ -53,6 +55,18 @@ const Product = () => {
       setSelectedPosterQuantity(minimum);
       setCustomPosterQuantity(String(minimum));
       setUseCustomPosterQuantity(false);
+    }
+    if (trackedProductIdRef.current !== item._id) {
+      const value = isPosterProduct(item)
+        ? getPosterPrice(item, getPosterMinimum(item)) ?? item.price
+        : item.price;
+      trackViewContent({
+        id: item._id,
+        name: item.name,
+        category: item.category,
+        value,
+      });
+      trackedProductIdRef.current = item._id;
     }
   }, [productId, products]);
 
