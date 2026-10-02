@@ -161,7 +161,7 @@ const Discounts = ({ token }) => {
                                 <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Code</th>
                                 <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Discount</th>
                                 <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Status</th>
-                                <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Used</th>
+                                <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Availability</th>
                                 <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap">Created Date</th>
                                 <th className="p-3 text-xs uppercase tracking-widest font-bold text-primary whitespace-nowrap text-right">Actions</th>
                             </tr>
@@ -192,11 +192,9 @@ const Discounts = ({ token }) => {
                                             </button>
                                         </td>
                                         <td className="p-3">
-                                            {item.isUsed ? (
-                                                <span className="text-xs px-2 py-1 font-bold tracking-widest uppercase text-secondary bg-gray-100 border border-gray-200">Yes</span>
-                                            ) : (
-                                                <span className="text-xs px-2 py-1 font-bold tracking-widest uppercase text-blue-600 bg-blue-50 border border-blue-200">No</span>
-                                            )}
+                                            <span className="text-xs px-2 py-1 font-bold tracking-widest uppercase text-blue-600 bg-blue-50 border border-blue-200">
+                                                Until deleted
+                                            </span>
                                         </td>
                                         <td className="p-3 text-secondary text-xs">
                                             {new Date(item.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -204,10 +202,12 @@ const Discounts = ({ token }) => {
                                         <td className="p-3 text-right">
                                             <button 
                                                 onClick={() => removeDiscount(item._id)}
-                                                className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-full transition-colors"
+                                                className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded transition-colors text-xs font-bold uppercase tracking-wider"
                                                 title="Delete Discount"
+                                                aria-label={`Delete discount code ${item.code}`}
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={14} />
+                                                Delete
                                             </button>
                                         </td>
                                     </tr>

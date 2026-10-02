@@ -132,13 +132,12 @@ const placeOrder = async (req, res) => {
         const amount = validated.amount;
 
         let discountDetails = { code: '', percentage: 0, amount: 0 };
-        let discountId = null;
 
         if (discountCode) {
             const normalizedCode = discountCode.trim().toUpperCase();
             const discount = await discountModel.findOne({code: normalizedCode});
             
-            if(!discount || !discount.isActive || discount.isUsed) {
+            if(!discount || !discount.isActive) {
                 return res.json({ success: false, message: "Invalid or expired discount code." });
             }
             
@@ -148,7 +147,6 @@ const placeOrder = async (req, res) => {
                 percentage: discount.discountPercentage,
                 amount: discountAmount
             };
-            discountId = discount._id;
         }
         const orderTotals = calculateOrderTotals(amount, discountDetails.amount);
 
@@ -169,10 +167,6 @@ const placeOrder = async (req, res) => {
 
         const newOrder = new orderModel(orderData);
         await newOrder.save();
-
-        if (discountId) {
-            await discountModel.findByIdAndUpdate(discountId, { isUsed: true });
-        }
 
         res.json({ success: true, message: "Order Placed Successfully" });
 
@@ -418,14 +412,13 @@ const verifyOrderOtp = async (req, res) => {
 
         // Process Discount
         let discountDetails = { code: '', percentage: 0, amount: 0 };
-        let discountId = null;
 
         if (discountCode) {
             const normalizedCode = discountCode.trim().toUpperCase();
             const discount = await discountModel.findOne({code: normalizedCode});
             
-            if(!discount || !discount.isActive || discount.isUsed) {
-                return res.json({ success: false, message: "Discount code is no longer valid or has been used." });
+            if(!discount || !discount.isActive) {
+                return res.json({ success: false, message: "Discount code is no longer valid." });
             }
             
             const discountAmount = Math.round((amount * discount.discountPercentage) / 100);
@@ -434,7 +427,6 @@ const verifyOrderOtp = async (req, res) => {
                 percentage: discount.discountPercentage,
                 amount: discountAmount
             };
-            discountId = discount._id;
         }
         const orderTotals = calculateOrderTotals(amount, discountDetails.amount);
 
@@ -458,10 +450,6 @@ const verifyOrderOtp = async (req, res) => {
 
         const newOrder = new orderModel(orderData);
         await newOrder.save();
-        
-        if (discountId) {
-            await discountModel.findByIdAndUpdate(discountId, { isUsed: true });
-        }
 
         // Store orderId on OTP record for reference
         await otpModel.findByIdAndUpdate(otpRecord._id, { orderId: newOrder._id.toString() });

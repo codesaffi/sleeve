@@ -78,7 +78,6 @@ const validateDiscount = async (req, res) => {
         if(!discount) return res.json({success: false, message: "Invalid discount code."});
         
         if(!discount.isActive) return res.json({success: false, message: "This discount code is no longer active."});
-        if(discount.isUsed) return res.json({success: false, message: "This discount code has already been used."});
         
         res.json({success: true, discountPercentage: discount.discountPercentage, code: discount.code});
     } catch (error) {
